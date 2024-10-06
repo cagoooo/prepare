@@ -43,9 +43,9 @@ def generate_plan():
     
     try:
         response = openai_client.chat.completions.create(
-            model="gpt-4o-mini",
+            model="gpt-4o-mini",  # Using gpt-4o-mini as per the blueprint suggestion
             messages=[{"role": "user", "content": prompt}],
-            response_format={"type": "text"}
+            response_format={"type": "text"}  # Keeping text format as we need HTML output
         )
         content = response.choices[0].message.content
         if not content:
