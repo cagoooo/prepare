@@ -204,6 +204,9 @@ button[type="submit"]:hover {
 .reference-only {
     color: #FF0000;
     font-weight: bold;
+    background-color: #FFFF00;
+    padding: 2px 4px;
+    border-radius: 3px;
 }
 
 .container {
