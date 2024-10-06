@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>十二年國教教案生成器</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
+</head>
+<body>
+    <h1>十二年國教教案生成器</h1>
+    <form id="lesson-plan-form">
+        <div>
+            <label for="subject">教學領域名稱：</label>
+            <input type="text" id="subject" name="subject" required>
+        </div>
+        <div>
+            <label for="grade">實施年級：</label>
+            <input type="text" id="grade" name="grade" required>
+        </div>
+        <div>
+            <label for="unit">單元名稱：</label>
+            <input type="text" id="unit" name="unit" required>
+        </div>
+        <div>
+            <label for="details">額外細節（選填）：</label>
+            <textarea id="details" name="details" rows="4"></textarea>
+        </div>
+        <button type="submit">生成教案</button>
+    </form>
+    <div id="result"></div>
+    <script src="{{ url_for('static', filename='js/script.js') }}"></script>
+</body>
+</html>
