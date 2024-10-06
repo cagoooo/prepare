@@ -7,33 +7,27 @@
     <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
 </head>
 <body>
-    <div class="container">
-        <header>
-            <h1 class="rainbow-text">十二年國教教案生成站</h1>
-        </header>
-        <main>
-            <form id="lesson-plan-form">
-                <div class="form-group">
-                    <label for="subject" class="animated-label">教學領域名稱(必填)：</label>
-                    <input type="text" id="subject" name="subject" required class="animated-input">
-                </div>
-                <div class="form-group">
-                    <label for="grade" class="animated-label">實施年級(必填)：</label>
-                    <input type="text" id="grade" name="grade" required class="animated-input">
-                </div>
-                <div class="form-group">
-                    <label for="unit" class="animated-label">單元名稱(必填)：</label>
-                    <input type="text" id="unit" name="unit" required class="animated-input">
-                </div>
-                <div class="form-group">
-                    <label for="details" class="animated-label">額外細節（選填）：</label>
-                    <textarea id="details" name="details" rows="4" class="animated-input"></textarea>
-                </div>
-                <button type="submit" class="generate-button">生成教案</button>
-            </form>
-        </main>
-        <div id="result"></div>
-    </div>
+    <h1>十二年國教教案生成站</h1>
+    <form id="lesson-plan-form">
+        <div>
+            <label for="subject">教學領域(必填)：</label>
+            <input type="text" id="subject" name="subject" required>
+        </div>
+        <div>
+            <label for="grade">實施年級(必填)：</label>
+            <input type="text" id="grade" name="grade" required>
+        </div>
+        <div>
+            <label for="unit">單元名稱(必填)：</label>
+            <input type="text" id="unit" name="unit" required>
+        </div>
+        <div>
+            <label for="details">額外細節（選填）：</label>
+            <textarea id="details" name="details" rows="4"></textarea>
+        </div>
+        <button type="submit">生成教案</button>
+    </form>
+    <div id="result"></div>
     <script src="{{ url_for('static', filename='js/script.js') }}"></script>
 </body>
 </html>

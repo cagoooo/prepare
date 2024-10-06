@@ -251,20 +251,33 @@ button[type="submit"]:hover {
     -webkit-text-fill-color: transparent;
     background-clip: text;
     color: #333; /* Fallback color */
-    animation: rainbow-animation 5s ease-in-out infinite;
+    animation: rainbow-animation 5s ease-in-out infinite, pulse 2s infinite;
     background-size: 400% 100%;
-    font-size: 36px;
+    font-size: 40px;
     font-weight: bold;
     text-align: center;
-    padding: 20px;
+    padding: 30px;
     margin-bottom: 30px;
-    border: 5px solid;
+    border: 8px solid transparent;
     border-image: linear-gradient(to right, violet, indigo, blue, green, yellow, orange, red) 1;
+    border-image-slice: 1;
+    box-shadow: 0 0 15px rgba(0,0,0,0.2);
+    transition: all 0.3s ease;
+}
+
+.rainbow-text:hover {
+    transform: scale(1.05);
+    box-shadow: 0 0 25px rgba(0,0,0,0.3);
 }
 
 @keyframes rainbow-animation {
     0%, 100% { background-position: 0 0; }
     50% { background-position: 100% 0; }
+}
+
+@keyframes pulse {
+    0%, 100% { transform: scale(1); }
+    50% { transform: scale(1.05); }
 }
 
 .form-group {
