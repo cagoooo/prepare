@@ -50,19 +50,22 @@ def html_to_docx(html_content):
                     
                     # Split the content by <br> tags
                     content_parts = cell.decode_contents().split('<br>')
+                    current_section = None
                     
                     for part in content_parts:
                         # Remove HTML tags
                         clean_part = BeautifulSoup(part, 'html.parser').get_text(strip=True)
                         
                         if clean_part:
-                            p = docx_cell.add_paragraph()
-                            p.style = 'List Bullet'
-                            run = p.add_run(clean_part)
-                            
-                            # Apply bold formatting to main headings
                             if any(heading in clean_part for heading in ['引起動機', '發展活動', '綜合活動']):
-                                run.bold = True
+                                p = docx_cell.add_paragraph()
+                                p.add_run(clean_part).bold = True
+                                current_section = clean_part
+                            else:
+                                if current_section:
+                                    p = docx_cell.add_paragraph(clean_part, style='List Bullet')
+                                else:
+                                    p = docx_cell.add_paragraph(clean_part)
                 else:
                     docx_cell.text = cell.get_text(strip=True)
                 
