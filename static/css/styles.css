@@ -224,6 +224,19 @@ button[type="submit"]:hover {
     color: transparent;
     animation: rainbow-animation 5s ease-in-out infinite;
     background-size: 400% 100%;
+    font-size: 36px;
+    font-weight: bold;
+    text-align: center;
+    padding: 20px;
+    margin-bottom: 30px;
+    border: 5px solid transparent;
+    border-image: linear-gradient(to right, violet, indigo, blue, green, yellow, orange, red);
+    border-image-slice: 1;
+    background-clip: padding-box, border-box;
+    background-origin: padding-box, border-box;
+    background-image: 
+        linear-gradient(to right, #fff, #fff), 
+        linear-gradient(to right, violet, indigo, blue, green, yellow, orange, red);
 }
 
 @keyframes rainbow-animation {
