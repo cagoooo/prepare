@@ -101,17 +101,6 @@ button[type="submit"]:hover {
     background-color: #27ae60;
 }
 
-button[type="submit"].disabled {
-    background-color: #95a5a6;
-    cursor: not-allowed;
-}
-
-button[type="submit"].disabled:hover {
-    background-color: #95a5a6;
-    transform: none;
-    box-shadow: none;
-}
-
 #downloadBtn {
     background-color: #e74c3c;
 }

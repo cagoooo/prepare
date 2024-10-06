@@ -1,14 +1,9 @@
 document.addEventListener('DOMContentLoaded', function() {
     const form = document.getElementById('lesson-plan-form');
     const resultDiv = document.getElementById('result');
-    const submitBtn = document.querySelector('button[type="submit"]');
 
     form.addEventListener('submit', function(e) {
         e.preventDefault();
-        
-        // Disable the submit button
-        submitBtn.disabled = true;
-        submitBtn.classList.add('disabled');
         
         const subject = document.getElementById('subject').value;
         const grade = document.getElementById('grade').value;
@@ -37,15 +32,9 @@ document.addEventListener('DOMContentLoaded', function() {
             } else {
                 resultDiv.innerHTML = `<p>生成教案時出錯：${data.error}</p>`;
             }
-            // Re-enable the submit button
-            submitBtn.disabled = false;
-            submitBtn.classList.remove('disabled');
         })
         .catch(error => {
             resultDiv.innerHTML = `<p>請求出錯：${error}</p>`;
-            // Re-enable the submit button
-            submitBtn.disabled = false;
-            submitBtn.classList.remove('disabled');
         });
     });
 });
