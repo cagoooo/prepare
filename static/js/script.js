@@ -27,7 +27,21 @@ document.addEventListener('DOMContentLoaded', function() {
         .then(response => response.json())
         .then(data => {
             if (data.success) {
-                resultDiv.innerHTML = data.plan;
+                // Parse the HTML content
+                const parser = new DOMParser();
+                const doc = parser.parseFromString(data.plan, 'text/html');
+                
+                // Find all elements with class 'reference-only'
+                const referenceElements = doc.querySelectorAll('.reference-only');
+                
+                // Add line break before each '（僅供參考）' text
+                referenceElements.forEach(elem => {
+                    elem.innerHTML = '<br>' + elem.innerHTML;
+                });
+                
+                // Set the innerHTML of the resultDiv
+                resultDiv.innerHTML = doc.body.innerHTML;
+                
                 // Add download button with id 'downloadBtn'
                 const downloadBtn = document.createElement('button');
                 downloadBtn.textContent = '下載 Word 檔案';
