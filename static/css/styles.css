@@ -221,7 +221,9 @@ button[type="submit"]:hover {
 .rainbow-text {
     background-image: linear-gradient(to right, violet, indigo, blue, green, yellow, orange, red);
     -webkit-background-clip: text;
-    color: transparent;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    color: #333; /* Fallback color */
     animation: rainbow-animation 5s ease-in-out infinite;
     background-size: 400% 100%;
     font-size: 36px;
@@ -229,14 +231,8 @@ button[type="submit"]:hover {
     text-align: center;
     padding: 20px;
     margin-bottom: 30px;
-    border: 5px solid transparent;
-    border-image: linear-gradient(to right, violet, indigo, blue, green, yellow, orange, red);
-    border-image-slice: 1;
-    background-clip: padding-box, border-box;
-    background-origin: padding-box, border-box;
-    background-image: 
-        linear-gradient(to right, #fff, #fff), 
-        linear-gradient(to right, violet, indigo, blue, green, yellow, orange, red);
+    border: 5px solid;
+    border-image: linear-gradient(to right, violet, indigo, blue, green, yellow, orange, red) 1;
 }
 
 @keyframes rainbow-animation {
