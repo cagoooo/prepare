@@ -72,14 +72,18 @@ input[type="text"], textarea {
 }
 
 button {
+    width: 100%;
+    max-width: 300px;
+    margin: 10px auto;
+    display: block;
+    font-size: 18px;
+    padding: 12px 20px;
+    box-shadow: 0 4px 6px rgba(0,0,0,0.1);
     background-color: #3498db;
     color: #fff;
-    padding: 10px 15px;
     border: none;
     border-radius: 4px;
     cursor: pointer;
-    font-size: 16px;
-    margin-right: 10px;
     transition: all 0.3s ease;
     position: relative;
     overflow: hidden;
@@ -88,7 +92,7 @@ button {
 button:hover {
     background-color: #2980b9;
     transform: translateY(-2px);
-    box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+    box-shadow: 0 6px 8px rgba(0,0,0,0.15);
 }
 
 button:active {
@@ -139,10 +143,19 @@ button[type="submit"]:hover {
 
 #downloadBtn {
     background-color: #e74c3c;
+    width: 100%;
+    max-width: 300px;
+    margin: 10px auto;
+    display: block;
+    font-size: 18px;
+    padding: 12px 20px;
+    box-shadow: 0 4px 6px rgba(0,0,0,0.1);
 }
 
 #downloadBtn:hover {
     background-color: #c0392b;
+    transform: translateY(-2px);
+    box-shadow: 0 6px 8px rgba(0,0,0,0.15);
 }
 
 #result {
@@ -261,14 +274,15 @@ button[type="submit"]:hover {
     font-weight: bold;
     text-align: center;
     padding: 20px;
-    margin-bottom: 30px;
     text-shadow: 3px 3px 6px rgba(0,0,0,0.3);
     font-family: 'Arial Black', 'Microsoft JhengHei', sans-serif;
     letter-spacing: 2px;
     border: 4px solid;
     border-image: linear-gradient(45deg, #990000, #006600, #000099, #996600) 1;
     border-radius: 10px;
-    display: inline-block;
+    display: block;
+    margin: 0 auto 30px;
+    max-width: 100%;
 }
 
 @keyframes rainbow-animation {
