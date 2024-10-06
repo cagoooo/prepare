@@ -119,27 +119,23 @@ button[type="submit"]:hover {
 
 .loading {
     text-align: center;
-    font-style: italic;
-    color: #2c3e50;
-    font-size: 18px;
+    font-size: 24px;
     font-weight: bold;
     padding: 20px;
-    background-color: rgba(236, 240, 241, 0.8);
-    border-radius: 10px;
-    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-    animation: pulse 2s infinite;
+    background: linear-gradient(45deg, #ff9a9e, #fad0c4, #ffecd2);
+    border-radius: 15px;
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+    animation: colorChange 5s infinite alternate, bounce 0.5s infinite alternate;
 }
 
-@keyframes pulse {
-    0% {
-        opacity: 0.6;
-    }
-    50% {
-        opacity: 1;
-    }
-    100% {
-        opacity: 0.6;
-    }
+@keyframes colorChange {
+    0% { background-position: 0% 50%; }
+    100% { background-position: 100% 50%; }
+}
+
+@keyframes bounce {
+    0% { transform: translateY(0); }
+    100% { transform: translateY(-10px); }
 }
 
 .lesson-plan {

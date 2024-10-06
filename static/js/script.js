@@ -5,6 +5,11 @@ document.addEventListener('DOMContentLoaded', function() {
     form.addEventListener('submit', function(e) {
         e.preventDefault();
         
+        const submitButton = form.querySelector('button[type="submit"]');
+        submitButton.disabled = true;
+        submitButton.style.opacity = '0.5';
+        submitButton.style.cursor = 'not-allowed';
+
         const subject = document.getElementById('subject').value;
         const grade = document.getElementById('grade').value;
         const unit = document.getElementById('unit').value;
@@ -32,9 +37,15 @@ document.addEventListener('DOMContentLoaded', function() {
             } else {
                 resultDiv.innerHTML = `<p>生成教案時出錯：${data.error}</p>`;
             }
+            submitButton.disabled = false;
+            submitButton.style.opacity = '1';
+            submitButton.style.cursor = 'pointer';
         })
         .catch(error => {
             resultDiv.innerHTML = `<p>請求出錯：${error}</p>`;
+            submitButton.disabled = false;
+            submitButton.style.opacity = '1';
+            submitButton.style.cursor = 'pointer';
         });
     });
 });
