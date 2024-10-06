@@ -31,14 +31,27 @@ def generate_plan():
     
     額外細節：{data['details']}
     
-    請包含以下欄位：
-    1. 教學目標
-    2. 教學活動
-    3. 評量方式
-    4. 教學資源
-    5. 注意事項
+    請包含以下欄位，並使用適當的HTML標籤來組織內容：
+    1. 領域名稱
+    2. 設計者
+    3. 實施年級
+    4. 單元名稱
+    5. 總綱核心素養（僅提供參考）
+    6. 領綱核心素養（僅提供參考）
+    7. 核心素養呼應說明
+    8. 學習重點-學習表現
+    9. 學習重點-學習內容
+    10. 議題融入-實質內涵（僅提供參考）
+    11. 議題融入-所融入之學習重點
+    12. 教材來源
+    13. 教學資源-教師
+    14. 教學資源-學生
+    15. 學習目標（僅提供參考）
+    16. 教學重點
+    17. 教學活動內容及實施方式
+    18. 評量方式
     
-    請以HTML格式回覆，使用適當的標籤來組織內容。
+    請使用<table>, <tr>, <td>等HTML標籤來組織這些欄位，確保生成的HTML結構清晰、易於樣式化。
     """
     
     try:
@@ -50,7 +63,10 @@ def generate_plan():
         content = response.choices[0].message.content
         if not content:
             raise ValueError("OpenAI returned an empty response.")
-        return jsonify({"success": True, "plan": content})
+        
+        # Wrap the content in a div for easier styling
+        formatted_content = f"<div class='lesson-plan'>{content}</div>"
+        return jsonify({"success": True, "plan": formatted_content})
     except Exception as e:
         return jsonify({"success": False, "error": str(e)}), 500
 
