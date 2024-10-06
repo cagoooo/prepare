@@ -232,7 +232,7 @@ button[type="submit"]:hover {
     color: #2c3e50;
     text-align: center;
     margin-bottom: 30px;
-    text-shadow: 2px 2px 4px rgba(0,0,0,0.2);
+    text-shadow: 3px 3px 6px rgba(0,0,0,0.3);
     background-color: #f1c40f;
     padding: 15px;
     border-radius: 10px;
@@ -264,6 +264,7 @@ button[type="submit"]:hover {
     padding: 2px 4px;
     border-radius: 3px;
     margin-top: 5px;
+    background-color: #FFFF00;
 }
 
 .rainbow-text {
@@ -326,7 +327,7 @@ button[type="submit"]:hover {
 }
 
 .generate-button {
-    background-color: #2ecc71;
+    background-image: linear-gradient(to right, #2ecc71, #27ae60);
     color: white;
     padding: 15px 30px;
     border: none;
@@ -336,10 +337,12 @@ button[type="submit"]:hover {
     cursor: pointer;
     transition: all 0.3s ease;
     box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+    position: relative;
+    overflow: hidden;
 }
 
 .generate-button:hover {
-    background-color: #27ae60;
+    background-image: linear-gradient(to right, #27ae60, #2ecc71);
     transform: translateY(-3px);
     box-shadow: 0 6px 8px rgba(0,0,0,0.15);
 }
@@ -347,4 +350,22 @@ button[type="submit"]:hover {
 .generate-button:active {
     transform: translateY(-1px);
     box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.generate-button::after {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 5px;
+    height: 5px;
+    background: rgba(255, 255, 255, 0.5);
+    opacity: 0;
+    border-radius: 100%;
+    transform: scale(1, 1) translate(-50%);
+    transform-origin: 50% 50%;
+}
+
+.generate-button:focus:not(:active)::after {
+    animation: ripple 1s ease-out;
 }
