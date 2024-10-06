@@ -1,6 +1,7 @@
 import os
 from flask import Flask, render_template, request, jsonify
 from openai import OpenAI
+import opencc
 
 app = Flask(__name__)
 
@@ -25,6 +26,8 @@ def generate_plan():
     print(f"Received request data: {data}")
 
     prompt = f"""
+請使用繁體中文回答，並使用台灣常用的詞彙及口語表達。
+
 請為以下教學活動生成一個完整的十二年國教教案：
 
 教學領域名稱：{data['subject']}
@@ -83,6 +86,10 @@ def generate_plan():
         content = response.choices[0].message.content
         if not content:
             raise ValueError("OpenAI returned an empty response.")
+
+        # 將簡體中文轉換為繁體中文
+        converter = opencc.OpenCC('s2twp.json')
+        content = converter.convert(content)
 
         # 移除 HTML 註釋和總結句
         content = content.replace('```html', '').replace('```', '').strip()
