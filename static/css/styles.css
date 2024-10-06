@@ -200,3 +200,8 @@ button[type="submit"]:hover {
         padding: 8px;
     }
 }
+
+.reference-only {
+    color: #FF0000;
+    font-weight: bold;
+}
