@@ -66,8 +66,6 @@ def generate_plan():
     print(f"Received request data: {data}")
 
     prompt = f"""
-請使用繁體中文回答，並確保使用台灣常用的詞彙和用語。
-
 請為以下教學活動生成一個完整的十二年國教教案：
 
 教學領域名稱：{data['subject']}
@@ -119,12 +117,7 @@ def generate_plan():
         response = openai_client.chat.completions.create(
             model="gpt-4o-mini",
             messages=[{"role": "user", "content": prompt}],
-            response_format={"type": "text"},
-            temperature=0.7,
-            max_tokens=2000,
-            top_p=0.8,
-            frequency_penalty=0.5,
-            presence_penalty=0.5
+            response_format={"type": "text"}
         )
         print(f"Received response from OpenAI API: {response}")
 
