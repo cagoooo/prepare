@@ -22,77 +22,79 @@ def generate_plan():
         return jsonify({"success": False, "error": "OpenAI API key is not set"}), 500
 
     data = request.json
-    print(f"Received request data: {data}")  # 新增
+    print(f"Received request data: {data}")
 
     prompt = f"""
-    請為以下教學活動生成一個完整的十二年國教教案：
-    
-    教學領域名稱：{data['subject']}
-    實施年級：{data['grade']}
-    單元名稱：{data['unit']}
-    
-    額外細節：{data['details']}
-    
-    請包含以下欄位，並使用適當的HTML標籤來組織內容：
-    1. 領域名稱
-    2. 設計者
-    3. 實施年級
-    4. 單元名稱
-    5. 總綱核心素養（僅提供參考）
-    6. 領綱核心素養（僅提供參考）
-    7. 核心素養呼應說明
-    8. 學習重點-學習表現
-    9. 學習重點-學習內容
-    10. 議題融入-實質內涵（僅提供參考）
-    11. 議題融入-所融入之學習重點
-    12. 教材來源
-    13. 教學資源-教師
-    14. 教學資源-學生
-    15. 學習目標（僅提供參考）
-    16. 教學重點
-    17. 教學活動內容及實施方式
-    18. 評量方式
-    
-    請使用<table>, <tr>, <td>等HTML標籤來組織這些欄位，確保生成的HTML結構清晰、易於樣式化。
+請為以下教學活動生成一個完整的十二年國教教案：
 
-    請特別注意「教學活動內容及實施方式」部分，應包含以下詳細資訊：
-    1. 課前準備：列出教師需要準備的教材、器材等。請說明課前準備預計需要多少時間。
-    2. 引起動機：描述如何吸引學生注意力並引導他們進入學習狀態。請說明此階段預計花費的時間。
-    3. 發展活動：
-       a. 詳細說明每個教學步驟，包括每個步驟的時間分配。
-       b. 描述教師如何引導學生思考、討論或操作。
-       c. 提供具體的問題示例或活動指引。
-       請確保發展活動的總時間分配明確。
-    4. 綜合活動：說明如何幫助學生整合所學知識，並指明這個階段預計的時間。
-    5. 課後延伸：提供相關的課後作業或延伸閱讀建議。
+教學領域名稱：{data['subject']}
+實施年級：{data['grade']}
+單元名稱：{data['unit']}
 
-    請確保每個部分都有充分且具體的描述，包括時間分配，使教師能夠輕鬆理解並執行這個教案。總字數應不少於500字。
-    """
-    
-    print(f"Generated prompt:\n{prompt}")  # 新增
+額外細節：{data['details']}
+
+請生成一個包含以下欄位的 HTML 表格，標題為「教學活動設計」：
+
+1. 領域名稱
+2. 設計者
+3. 實施年級
+4. 單元名稱
+5. 總綱核心素養（僅提供參考）
+6. 領綱核心素養（僅提供參考）
+7. 核心素養呼應說明
+8. 學習重點-學習表現
+9. 學習重點-學習內容
+10. 議題融入-實質內涵（僅提供參考）
+11. 議題融入-所融入之學習重點
+12. 教材來源
+13. 教學資源-教師
+14. 教學資源-學生
+15. 學習目標（僅提供參考）
+16. 教學重點
+17. 課前準備
+18. 教學活動內容及實施方式
+19. 課後延伸
+20. 評量方式
+
+請特別注意「教學活動內容及實施方式」部分，總時間為 40 分鐘，應包含以下詳細資訊：
+1. 引起動機：描述如何吸引學生注意力並引導他們進入學習狀態。請說明此階段預計花費的時間。
+2. 發展活動：
+   a. 詳細說明每個教學步驟，包括每個步驟的時間分配。
+   b. 描述教師如何引導學生思考、討論或操作。
+   c. 提供具體的問題示例或活動指引。
+3. 綜合活動：說明如何幫助學生整合所學知識，並指明這個階段預計的時間。
+
+請確保每個部分都有充分且具體的描述，包括時間分配，使教師能夠輕鬆理解並執行這個教案。
+"""
+
+    print(f"Generated prompt:\n{prompt}")
 
     try:
-        print("Sending request to OpenAI API...")  # 新增
+        print("Sending request to OpenAI API...")
         response = openai_client.chat.completions.create(
-            model="gpt-4o-mini",  # Using gpt-4o-mini as per the blueprint suggestion
+            model="gpt-4o-mini",
             messages=[{"role": "user", "content": prompt}],
-            response_format={"type": "text"}  # Keeping text format as we need HTML output
+            response_format={"type": "text"}
         )
-        print(f"Received response from OpenAI API: {response}")  # 新增
+        print(f"Received response from OpenAI API: {response}")
 
         content = response.choices[0].message.content
         if not content:
             raise ValueError("OpenAI returned an empty response.")
-        
-        print(f"Processed content:\n{content}")  # 新增
+
+        # 移除 HTML 註釋和總結句
+        content = content.replace('```html', '').replace('```', '').strip()
+        content = content.split('</table>')[0] + '</table>'
+
+        print(f"Processed content:\n{content}")
 
         # Wrap the content in a div for easier styling
         formatted_content = f"<div class='lesson-plan'>{content}</div>"
-        print(f"Final formatted content:\n{formatted_content}")  # 新增
+        print(f"Final formatted content:\n{formatted_content}")
 
         return jsonify({"success": True, "plan": formatted_content})
     except Exception as e:
-        print(f"Error occurred: {str(e)}")  # 新增
+        print(f"Error occurred: {str(e)}")
         return jsonify({"success": False, "error": str(e)}), 500
 
 if __name__ == '__main__':
