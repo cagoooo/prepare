@@ -88,7 +88,7 @@ def generate_plan():
             raise ValueError("OpenAI returned an empty response.")
 
         # 將簡體中文轉換為繁體中文
-        converter = opencc.OpenCC('s2twp.json')
+        converter = opencc.OpenCC('s2twp')
         content = converter.convert(content)
 
         # 移除 HTML 註釋和總結句
