@@ -3,7 +3,10 @@ from flask import Flask, render_template, request, jsonify, send_file
 from openai import OpenAI
 import io
 from docx import Document
-from docx.shared import Inches
+from docx.shared import Inches, Pt
+from docx.enum.table import WD_TABLE_ALIGNMENT
+from docx.oxml import OxmlElement
+from docx.oxml.ns import qn
 from bs4 import BeautifulSoup
 
 app = Flask(__name__)
@@ -32,11 +35,32 @@ def html_to_docx(html_content):
         # Create a table in the Word document
         rows = table.find_all('tr')
         docx_table = doc.add_table(rows=len(rows), cols=2)
+        docx_table.style = 'Table Grid'
+        docx_table.alignment = WD_TABLE_ALIGNMENT.CENTER
         
         for i, row in enumerate(rows):
             cells = row.find_all(['th', 'td'])
             for j, cell in enumerate(cells):
-                docx_table.cell(i, j).text = cell.get_text(strip=True)
+                docx_cell = docx_table.cell(i, j)
+                docx_cell.text = cell.get_text(strip=True)
+                
+                # Apply formatting to cells
+                for paragraph in docx_cell.paragraphs:
+                    for run in paragraph.runs:
+                        run.font.size = Pt(11)
+                        run.font.name = 'Microsoft JhengHei'
+                
+                # Apply bold formatting to header cells
+                if cell.name == 'th':
+                    for paragraph in docx_cell.paragraphs:
+                        for run in paragraph.runs:
+                            run.font.bold = True
+                
+                # Add yellow highlight to cells containing "（僅供參考）"
+                if "（僅供參考）" in docx_cell.text:
+                    shading_elm = OxmlElement('w:shd')
+                    shading_elm.set(qn('w:fill'), "FFFF00")
+                    docx_cell._tc.get_or_add_tcPr().append(shading_elm)
     
     # Save the document to a BytesIO object
     docx_file = io.BytesIO()
