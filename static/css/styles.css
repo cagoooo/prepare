@@ -11,44 +11,186 @@ body {
 }
 
 @keyframes gradient {
-    0% { background-position: 0% 50%; }
-    50% { background-position: 100% 50%; }
-    100% { background-position: 0% 50%; }
+    0% {
+        background-position: 0% 50%;
+    }
+    50% {
+        background-position: 100% 50%;
+    }
+    100% {
+        background-position: 0% 50%;
+    }
 }
 
 .container {
-    max-width: 1200px;
+    max-width: 800px;
     margin: 0 auto;
     padding: 20px;
-    background-color: rgba(255, 255, 255, 0.9);
-    border-radius: 15px;
+    background-color: rgba(255, 255, 255, 0.8);
+    border-radius: 10px;
     box-shadow: 0 0 20px rgba(0,0,0,0.2);
     backdrop-filter: blur(10px);
+    transition: all 0.3s ease;
 }
 
-h1.rainbow-text {
-    font-size: 48px;
-    font-weight: bold;
+.container:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 5px 30px rgba(0,0,0,0.3);
+}
+
+form {
+    background-color: rgba(255, 255, 255, 0.9);
+    padding: 20px;
+    border-radius: 8px;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+    transition: all 0.3s ease;
+}
+
+form:hover {
+    transform: scale(1.02);
+    box-shadow: 0 5px 15px rgba(0,0,0,0.2);
+}
+
+h1 {
+    color: #2c3e50;
     text-align: center;
-    background-image: linear-gradient(45deg, #ff0000, #ff7f00, #ffff00, #00ff00, #0000ff, #8b00ff);
-    background-size: 600% 100%;
-    animation: rainbow-text-animation 6s ease infinite;
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-    background-clip: text;
-    color: transparent;
-    margin-bottom: 30px;
 }
 
-@keyframes rainbow-text-animation {
-    0% { background-position: 0 0; }
-    50% { background-position: 100% 0; }
-    100% { background-position: 0 0; }
+label {
+    display: block;
+    margin-bottom: 5px;
+    font-weight: bold;
+}
+
+input[type="text"], textarea {
+    width: 100%;
+    padding: 8px;
+    margin-bottom: 15px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    box-sizing: border-box;
+}
+
+button {
+    width: 100%;
+    max-width: 300px;
+    margin: 10px auto;
+    display: block;
+    font-size: 18px;
+    padding: 12px 20px;
+    box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+    background-color: #3498db;
+    color: #fff;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    position: relative;
+    overflow: hidden;
+}
+
+button:hover {
+    background-color: #2980b9;
+    transform: translateY(-2px);
+    box-shadow: 0 6px 8px rgba(0,0,0,0.15);
+}
+
+button:active {
+    transform: translateY(0);
+    box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+}
+
+button::after {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 5px;
+    height: 5px;
+    background: rgba(255, 255, 255, 0.5);
+    opacity: 0;
+    border-radius: 100%;
+    transform: scale(1, 1) translate(-50%);
+    transform-origin: 50% 50%;
+}
+
+@keyframes ripple {
+    0% {
+        transform: scale(0, 0);
+        opacity: 1;
+    }
+    20% {
+        transform: scale(25, 25);
+        opacity: 1;
+    }
+    100% {
+        opacity: 0;
+        transform: scale(40, 40);
+    }
+}
+
+button:focus:not(:active)::after {
+    animation: ripple 1s ease-out;
+}
+
+button[type="submit"] {
+    background-color: #2ecc71;
+}
+
+button[type="submit"]:hover {
+    background-color: #27ae60;
+}
+
+#downloadBtn {
+    background-color: #e74c3c;
+    width: 100%;
+    max-width: 300px;
+    margin: 10px auto;
+    display: block;
+    font-size: 18px;
+    padding: 12px 20px;
+    box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+}
+
+#downloadBtn:hover {
+    background-color: #c0392b;
+    transform: translateY(-2px);
+    box-shadow: 0 6px 8px rgba(0,0,0,0.15);
+}
+
+#result {
+    margin-top: 20px;
+    background-color: #fff;
+    padding: 20px;
+    border-radius: 8px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.loading {
+    text-align: center;
+    font-size: 24px;
+    font-weight: bold;
+    padding: 20px;
+    background: linear-gradient(45deg, #ff9a9e, #fad0c4, #ffecd2);
+    border-radius: 15px;
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+    animation: colorChange 5s infinite alternate, bounce 0.5s infinite alternate;
+}
+
+@keyframes colorChange {
+    0% { background-position: 0% 50%; }
+    100% { background-position: 100% 50%; }
+}
+
+@keyframes bounce {
+    0% { transform: translateY(0); }
+    100% { transform: translateY(-10px); }
 }
 
 .lesson-plan {
-    background-color: #fff;
-    padding: 30px;
+    background-image: url('/static/images/paper_texture.jpg');
+    background-repeat: repeat;
+    padding: 20px;
     border-radius: 10px;
     box-shadow: 0 0 15px rgba(0,0,0,0.1);
 }
@@ -57,15 +199,15 @@ h1.rainbow-text {
     width: 100%;
     border-collapse: separate;
     border-spacing: 0;
-    border: 2px solid #3498db;
-    background-color: #fff;
+    border: 3px solid #2c3e50;
+    background-color: rgba(255, 255, 255, 0.9);
     margin-bottom: 20px;
     font-size: 14px;
 }
 
 .lesson-plan th,
 .lesson-plan td {
-    border: 1px solid #bdc3c7;
+    border: 1px solid #34495e;
     padding: 12px;
     text-align: left;
 }
@@ -78,7 +220,7 @@ h1.rainbow-text {
 }
 
 .lesson-plan tr:nth-child(even) {
-    background-color: #f2f2f2;
+    background-color: #ecf0f1;
 }
 
 .lesson-plan tr:hover {
@@ -86,11 +228,18 @@ h1.rainbow-text {
 }
 
 .lesson-plan h3 {
-    font-size: 24px;
+    font-size: 36px;
     color: #2c3e50;
-    margin-bottom: 20px;
-    border-bottom: 2px solid #3498db;
-    padding-bottom: 10px;
+    text-align: center;
+    margin-bottom: 30px;
+    text-shadow: 3px 3px 6px rgba(0,0,0,0.3);
+    background-color: #f1c40f;
+    padding: 15px;
+    border-radius: 10px;
+    display: inline-block;
+    position: relative;
+    left: 50%;
+    transform: translateX(-50%);
 }
 
 .lesson-plan p {
@@ -98,50 +247,125 @@ h1.rainbow-text {
     line-height: 1.6;
 }
 
-.reference-only {
-    color: #e74c3c;
-    font-weight: bold;
-    font-size: 0.9em;
-    display: inline-block;
-    padding: 2px 4px;
-    border-radius: 3px;
-    background-color: #ffeaa7;
-}
-
-#downloadBtn {
-    background-color: #2ecc71;
-    color: white;
-    border: none;
-    padding: 10px 20px;
-    font-size: 16px;
-    border-radius: 5px;
-    cursor: pointer;
-    transition: background-color 0.3s ease;
-}
-
-#downloadBtn:hover {
-    background-color: #27ae60;
-}
-
-@media screen and (max-width: 768px) {
-    .container {
-        padding: 10px;
-    }
-
-    .lesson-plan {
-        padding: 15px;
-    }
-
+@media screen and (max-width: 600px) {
     .lesson-plan table {
         font-size: 12px;
     }
-
     .lesson-plan th,
     .lesson-plan td {
         padding: 8px;
     }
+}
 
-    h1.rainbow-text {
-        font-size: 36px;
-    }
+.reference-only {
+    color: #FF0000;
+    font-weight: bold;
+    display: inline-block;
+    padding: 2px 4px;
+    border-radius: 3px;
+    margin-top: 5px;
+    background-color: #FFFF00;
+}
+
+.rainbow-text {
+    background-image: linear-gradient(45deg, #990000, #006600, #000099, #996600);
+    background-size: 300%;
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    color: transparent;
+    animation: rainbow-animation 5s ease-in-out infinite;
+    font-size: 48px;
+    font-weight: bold;
+    text-align: center;
+    padding: 20px;
+    text-shadow: 3px 3px 6px rgba(0,0,0,0.3);
+    font-family: 'Arial Black', 'Microsoft JhengHei', sans-serif;
+    letter-spacing: 2px;
+    border: 4px solid;
+    border-image: linear-gradient(45deg, #990000, #006600, #000099, #996600) 1;
+    border-radius: 10px;
+    display: block;
+    margin: 0 auto 30px;
+    max-width: 100%;
+}
+
+@keyframes rainbow-animation {
+    0% { background-position: 0% 50%; }
+    50% { background-position: 100% 50%; }
+    100% { background-position: 0% 50%; }
+}
+
+.form-group {
+    margin-bottom: 20px;
+}
+
+.animated-label {
+    display: block;
+    margin-bottom: 5px;
+    font-weight: bold;
+    color: #333;
+    transition: color 0.3s ease;
+}
+
+.animated-input {
+    width: 100%;
+    padding: 10px;
+    border: 2px solid #ddd;
+    border-radius: 5px;
+    font-size: 16px;
+    transition: all 0.3s ease;
+}
+
+.animated-input:focus {
+    border-color: #3498db;
+    box-shadow: 0 0 5px rgba(52, 152, 219, 0.5);
+}
+
+.animated-input:focus + .animated-label {
+    color: #3498db;
+}
+
+.generate-button {
+    background-image: linear-gradient(to right, #2ecc71, #27ae60);
+    color: white;
+    padding: 15px 30px;
+    border: none;
+    border-radius: 5px;
+    font-size: 20px;
+    font-weight: bold;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+    position: relative;
+    overflow: hidden;
+}
+
+.generate-button:hover {
+    background-image: linear-gradient(to right, #27ae60, #2ecc71);
+    transform: translateY(-3px);
+    box-shadow: 0 6px 8px rgba(0,0,0,0.15);
+}
+
+.generate-button:active {
+    transform: translateY(-1px);
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.generate-button::after {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 5px;
+    height: 5px;
+    background: rgba(255, 255, 255, 0.5);
+    opacity: 0;
+    border-radius: 100%;
+    transform: scale(1, 1) translate(-50%);
+    transform-origin: 50% 50%;
+}
+
+.generate-button:focus:not(:active)::after {
+    animation: ripple 1s ease-out;
 }
