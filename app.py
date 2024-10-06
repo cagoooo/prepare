@@ -1,6 +1,10 @@
 import os
-from flask import Flask, render_template, request, jsonify
+from flask import Flask, render_template, request, jsonify, send_file
 from openai import OpenAI
+import io
+from docx import Document
+from docx.shared import Inches
+from bs4 import BeautifulSoup
 
 app = Flask(__name__)
 
@@ -15,6 +19,43 @@ else:
 @app.route('/')
 def index():
     return render_template('index.html')
+
+def html_to_docx(html_content):
+    doc = Document()
+    doc.add_heading('教學活動設計', 0)
+    
+    # Parse the HTML content
+    soup = BeautifulSoup(html_content, 'html.parser')
+    table = soup.find('table')
+    
+    if table:
+        # Create a table in the Word document
+        rows = table.find_all('tr')
+        docx_table = doc.add_table(rows=len(rows), cols=2)
+        
+        for i, row in enumerate(rows):
+            cells = row.find_all(['th', 'td'])
+            for j, cell in enumerate(cells):
+                docx_table.cell(i, j).text = cell.get_text(strip=True)
+    
+    # Save the document to a BytesIO object
+    docx_file = io.BytesIO()
+    doc.save(docx_file)
+    docx_file.seek(0)
+    
+    return docx_file
+
+@app.route('/download_docx', methods=['POST'])
+def download_docx():
+    html_content = request.json['html_content']
+    docx_file = html_to_docx(html_content)
+    
+    return send_file(
+        docx_file,
+        as_attachment=True,
+        download_name='lesson_plan.docx',
+        mimetype='application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+    )
 
 @app.route('/generate_plan', methods=['POST'])
 def generate_plan():
@@ -94,7 +135,7 @@ def generate_plan():
         formatted_content = f"<div class='lesson-plan'>{content}</div>"
         print(f"Final formatted content:\n{formatted_content}")
 
-        return jsonify({"success": True, "plan": formatted_content})
+        return jsonify({"success": True, "plan": formatted_content, "html_content": content})
     except Exception as e:
         print(f"Error occurred: {str(e)}")
         return jsonify({"success": False, "error": str(e)}), 500

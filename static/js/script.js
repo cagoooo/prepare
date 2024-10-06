@@ -23,6 +23,11 @@ document.addEventListener('DOMContentLoaded', function() {
         .then(data => {
             if (data.success) {
                 resultDiv.innerHTML = data.plan;
+                // Add download button
+                const downloadBtn = document.createElement('button');
+                downloadBtn.textContent = '下載 Word 檔案';
+                downloadBtn.onclick = () => downloadDocx(data.html_content);
+                resultDiv.appendChild(downloadBtn);
             } else {
                 resultDiv.innerHTML = `<p>生成教案時出錯：${data.error}</p>`;
             }
@@ -32,3 +37,27 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     });
 });
+
+function downloadDocx(htmlContent) {
+    fetch('/download_docx', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ html_content: htmlContent }),
+    })
+    .then(response => response.blob())
+    .then(blob => {
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.style.display = 'none';
+        a.href = url;
+        a.download = 'lesson_plan.docx';
+        document.body.appendChild(a);
+        a.click();
+        window.URL.revokeObjectURL(url);
+    })
+    .catch(error => {
+        console.error('Error downloading file:', error);
+    });
+}
