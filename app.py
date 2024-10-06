@@ -8,6 +8,7 @@ from docx.enum.table import WD_TABLE_ALIGNMENT
 from docx.oxml import OxmlElement
 from docx.oxml.ns import qn
 from bs4 import BeautifulSoup
+from docx.enum.style import WD_STYLE_TYPE
 
 app = Flask(__name__)
 
@@ -42,7 +43,28 @@ def html_to_docx(html_content):
             cells = row.find_all(['th', 'td'])
             for j, cell in enumerate(cells):
                 docx_cell = docx_table.cell(i, j)
-                docx_cell.text = cell.get_text(strip=True)
+                
+                if '教學活動內容及實施方式' in cell.get_text():
+                    # Clear the cell content
+                    docx_cell.text = ''
+                    
+                    # Split the content by <br> tags
+                    content_parts = cell.decode_contents().split('<br>')
+                    
+                    for part in content_parts:
+                        # Remove HTML tags
+                        clean_part = BeautifulSoup(part, 'html.parser').get_text(strip=True)
+                        
+                        if clean_part:
+                            p = docx_cell.add_paragraph()
+                            p.style = 'List Bullet'
+                            run = p.add_run(clean_part)
+                            
+                            # Apply bold formatting to main headings
+                            if any(heading in clean_part for heading in ['引起動機', '發展活動', '綜合活動']):
+                                run.bold = True
+                else:
+                    docx_cell.text = cell.get_text(strip=True)
                 
                 # Apply formatting to cells
                 for paragraph in docx_cell.paragraphs:
@@ -61,6 +83,13 @@ def html_to_docx(html_content):
                     shading_elm = OxmlElement('w:shd')
                     shading_elm.set(qn('w:fill'), "FFFF00")
                     docx_cell._tc.get_or_add_tcPr().append(shading_elm)
+    
+    # Ensure 'List Bullet' style exists in the document
+    if 'List Bullet' not in doc.styles:
+        doc.styles.add_style('List Bullet', WD_STYLE_TYPE.PARAGRAPH)
+        doc.styles['List Bullet'].base_style = doc.styles['Normal']
+        doc.styles['List Bullet'].paragraph_format.left_indent = Inches(0.25)
+        doc.styles['List Bullet'].paragraph_format.first_line_indent = Inches(-0.25)
     
     # Save the document to a BytesIO object
     docx_file = io.BytesIO()
