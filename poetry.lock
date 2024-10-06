@@ -510,17 +510,6 @@ typing-extensions = ">=4.11,<5"
 datalib = ["numpy (>=1)", "pandas (>=1.2.3)", "pandas-stubs (>=1.1.0.11)"]
 
 [[package]]
-name = "opencc-python-reimplemented"
-version = "0.1.7"
-description = "OpenCC made with Python"
-optional = false
-python-versions = "*"
-files = [
-    {file = "opencc-python-reimplemented-0.1.7.tar.gz", hash = "sha256:4f777ea3461a25257a7b876112cfa90bb6acabc6dfb843bf4d11266e43579dee"},
-    {file = "opencc_python_reimplemented-0.1.7-py2.py3-none-any.whl", hash = "sha256:41b3b92943c7bed291f448e9c7fad4b577c8c2eae30fcfe5a74edf8818493aa6"},
-]
-
-[[package]]
 name = "psycopg2-binary"
 version = "2.9.9"
 description = "psycopg2 - Python-PostgreSQL Database Adapter"
@@ -874,4 +863,4 @@ watchdog = ["watchdog (>=2.3)"]
 [metadata]
 lock-version = "2.0"
 python-versions = "^3.11"
-content-hash = "1bccce967004d08371d1d0c8bce2af82700ede429742775f5e3e7a621bc5795e"
+content-hash = "8349d4baadbf798baffc488793cfd8be9ae747faa37a05e09ecfa61db1fca9ad"
