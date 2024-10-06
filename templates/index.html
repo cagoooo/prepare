@@ -7,7 +7,7 @@
     <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
 </head>
 <body>
-    <h1>十二年國教教案生成站</h1>
+    <h1 class="rainbow-text">十二年國教教案生成站</h1>
     <form id="lesson-plan-form">
         <div>
             <label for="subject">教學領域(必填)：</label>
@@ -22,7 +22,7 @@
             <input type="text" id="unit" name="unit" required>
         </div>
         <div>
-            <label for="details">額外細節（選填）：</label>
+            <label for="details">額外細節(選填)：</label>
             <textarea id="details" name="details" rows="4"></textarea>
         </div>
         <button type="submit">生成教案</button>
