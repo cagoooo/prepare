@@ -22,6 +22,8 @@ def generate_plan():
         return jsonify({"success": False, "error": "OpenAI API key is not set"}), 500
 
     data = request.json
+    print(f"Received request data: {data}")  # 新增
+
     prompt = f"""
     請為以下教學活動生成一個完整的十二年國教教案：
     
@@ -54,20 +56,30 @@ def generate_plan():
     請使用<table>, <tr>, <td>等HTML標籤來組織這些欄位，確保生成的HTML結構清晰、易於樣式化。
     """
     
+    print(f"Generated prompt:\n{prompt}")  # 新增
+
     try:
+        print("Sending request to OpenAI API...")  # 新增
         response = openai_client.chat.completions.create(
             model="gpt-4o-mini",  # Using gpt-4o-mini as per the blueprint suggestion
             messages=[{"role": "user", "content": prompt}],
             response_format={"type": "text"}  # Keeping text format as we need HTML output
         )
+        print(f"Received response from OpenAI API: {response}")  # 新增
+
         content = response.choices[0].message.content
         if not content:
             raise ValueError("OpenAI returned an empty response.")
         
+        print(f"Processed content:\n{content}")  # 新增
+
         # Wrap the content in a div for easier styling
         formatted_content = f"<div class='lesson-plan'>{content}</div>"
+        print(f"Final formatted content:\n{formatted_content}")  # 新增
+
         return jsonify({"success": True, "plan": formatted_content})
     except Exception as e:
+        print(f"Error occurred: {str(e)}")  # 新增
         return jsonify({"success": False, "error": str(e)}), 500
 
 if __name__ == '__main__':
