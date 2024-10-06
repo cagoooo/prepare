@@ -23,9 +23,10 @@ document.addEventListener('DOMContentLoaded', function() {
         .then(data => {
             if (data.success) {
                 resultDiv.innerHTML = data.plan;
-                // Add download button
+                // Add download button with id 'downloadBtn'
                 const downloadBtn = document.createElement('button');
                 downloadBtn.textContent = '下載 Word 檔案';
+                downloadBtn.id = 'downloadBtn';
                 downloadBtn.onclick = () => downloadDocx(data.html_content);
                 resultDiv.appendChild(downloadBtn);
             } else {
