@@ -252,9 +252,8 @@ def generate_plan():
     try:
         print("Sending request to OpenAI API...")
         response = openai_client.chat.completions.create(
-            model="gpt-4",
-            messages=[{"role": "user", "content": prompt}],
-            response_format={"type": "text"}
+            model="gpt-3.5-turbo",
+            messages=[{"role": "user", "content": prompt}]
         )
         print(f"Received response from OpenAI API: {response}")
 
