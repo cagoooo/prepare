@@ -252,7 +252,7 @@ def generate_plan():
     try:
         print("Sending request to OpenAI API...")
         response = openai_client.chat.completions.create(
-            model="gpt-4o-mini",
+            model="gpt-4",
             messages=[{"role": "user", "content": prompt}],
             response_format={"type": "text"}
         )
@@ -303,8 +303,8 @@ def generate_plan():
 app.config['MAIL_SERVER'] = 'smtp.gmail.com'
 app.config['MAIL_PORT'] = 587
 app.config['MAIL_USE_TLS'] = True
-app.config['MAIL_USERNAME'] = '210@mail2.smes.tyc.edu.tw'  # 替換為您的 Gmail 地址
-app.config['MAIL_PASSWORD'] = 'smes4711752'  # 替換為您的應用程序密碼
+app.config['MAIL_USERNAME'] = os.environ.get('MAIL_USERNAME')
+app.config['MAIL_PASSWORD'] = os.environ.get('MAIL_PASSWORD')
 mail = Mail(app)
 
 if __name__ == '__main__':
