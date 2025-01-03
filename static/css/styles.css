@@ -21,17 +21,22 @@ body {
   display: flex;
   align-items: center;
   padding: 15px 25px;
-  background: linear-gradient(45deg, #8B0000, #800080, #4B0082, #000080);
+  background: linear-gradient(45deg, #FFD700, #FFA500, #FF8C00, #FF7F50);
   background-size: 300% 300%;
   color: white;
   text-decoration: none;
   border-radius: 50px;
   font-size: 18px;
   font-weight: bold;
-  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.6);
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
   transition: all 0.3s ease;
-  animation: gradient 3s ease infinite, glow 2s ease-in-out infinite alternate;
-  border: 2px solid rgba(255, 255, 255, 0.2);
+  animation: gradient 3s ease infinite;
+  border: 2px solid rgba(255, 255, 255, 0.3);
+}
+
+#bee-link:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.4);
 }
 
 @keyframes gradient {
