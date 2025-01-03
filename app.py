@@ -315,7 +315,12 @@ app.config.update(
     MAIL_USERNAME=os.environ.get('MAIL_USERNAME'),
     MAIL_PASSWORD=os.environ.get('MAIL_PASSWORD')
 )
-mail = Mail(app)
+
+try:
+    mail = Mail(app)
+except Exception as e:
+    print(f"Mail initialization error: {str(e)}")
+    mail = None
 
 # Check if email credentials are set
 if not app.config['MAIL_USERNAME'] or not app.config['MAIL_PASSWORD']:
