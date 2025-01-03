@@ -10,6 +10,30 @@ body {
     min-height: 100vh;
 }
 
+#top-right-button {
+  position: fixed;
+  top: 20px;
+  right: 20px;
+  z-index: 1000;
+}
+
+#bee-link {
+  display: flex;
+  align-items: center;
+  padding: 15px 25px;
+  background: linear-gradient(45deg, #8B0000, #800080, #4B0082, #000080);
+  background-size: 300% 300%;
+  color: white;
+  text-decoration: none;
+  border-radius: 50px;
+  font-size: 18px;
+  font-weight: bold;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.6);
+  transition: all 0.3s ease;
+  animation: gradient 3s ease infinite, glow 2s ease-in-out infinite alternate;
+  border: 2px solid rgba(255, 255, 255, 0.2);
+}
+
 @keyframes gradient {
     0% {
         background-position: 0% 50%;
