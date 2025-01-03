@@ -16,10 +16,14 @@ app = Flask(__name__)
 OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY")
 
 if not OPENAI_API_KEY:
-    print("Warning: OPENAI_API_KEY is not set. Some features may not work.")
+    print("Error: OPENAI_API_KEY is not set in environment variables")
     openai_client = None
 else:
-    openai_client = OpenAI(api_key=OPENAI_API_KEY)
+    try:
+        openai_client = OpenAI(api_key=OPENAI_API_KEY)
+    except Exception as e:
+        print(f"Error initializing OpenAI client: {str(e)}")
+        openai_client = None
 
 @app.route('/')
 def index():
@@ -298,13 +302,19 @@ def generate_plan():
         print(f"Error occurred: {str(e)}")
         return jsonify({"success": False, "error": str(e)}), 500
 
-# 郵件配置
-app.config['MAIL_SERVER'] = 'smtp.gmail.com'
-app.config['MAIL_PORT'] = 587
-app.config['MAIL_USE_TLS'] = True
-app.config['MAIL_USERNAME'] = os.environ.get('MAIL_USERNAME')
-app.config['MAIL_PASSWORD'] = os.environ.get('MAIL_PASSWORD')
+# Email configuration
+app.config.update(
+    MAIL_SERVER='smtp.gmail.com',
+    MAIL_PORT=587,
+    MAIL_USE_TLS=True,
+    MAIL_USERNAME=os.environ.get('MAIL_USERNAME'),
+    MAIL_PASSWORD=os.environ.get('MAIL_PASSWORD')
+)
 mail = Mail(app)
+
+# Check if email credentials are set
+if not app.config['MAIL_USERNAME'] or not app.config['MAIL_PASSWORD']:
+    print("Warning: Email credentials not set. Email features may not work.")
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=8080)
