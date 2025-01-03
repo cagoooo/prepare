@@ -9,6 +9,7 @@ from docx.oxml import OxmlElement
 from docx.oxml.ns import qn
 from bs4 import BeautifulSoup
 from docx.enum.style import WD_STYLE_TYPE
+from flask_mail import Mail, Message
 
 app = Flask(__name__)
 
@@ -27,35 +28,35 @@ def index():
 def html_to_docx(html_content):
     doc = Document()
     doc.add_heading('教學活動設計', 0)
-    
+
     # Parse the HTML content
     soup = BeautifulSoup(html_content, 'html.parser')
     table = soup.find('table')
-    
+
     if table:
         # Create a table in the Word document
         rows = table.find_all('tr')
         docx_table = doc.add_table(rows=len(rows), cols=2)
         docx_table.style = 'Table Grid'
         docx_table.alignment = WD_TABLE_ALIGNMENT.CENTER
-        
+
         for i, row in enumerate(rows):
             cells = row.find_all(['th', 'td'])
             for j, cell in enumerate(cells):
                 docx_cell = docx_table.cell(i, j)
-                
+
                 if '教學活動內容及實施方式' in cell.get_text():
                     # Clear the cell content
                     docx_cell.text = ''
-                    
+
                     # Split the content by <br> tags
                     content_parts = cell.decode_contents().split('<br>')
                     current_section = None
-                    
+
                     for part in content_parts:
                         # Remove HTML tags
                         clean_part = BeautifulSoup(part, 'html.parser').get_text(strip=True)
-                        
+
                         if clean_part:
                             if any(heading in clean_part for heading in ['引起動機', '發展活動', '綜合活動']):
                                 p = docx_cell.add_paragraph()
@@ -68,44 +69,112 @@ def html_to_docx(html_content):
                                     p = docx_cell.add_paragraph(clean_part)
                 else:
                     docx_cell.text = cell.get_text(strip=True)
-                
+
                 # Apply formatting to cells
                 for paragraph in docx_cell.paragraphs:
                     for run in paragraph.runs:
                         run.font.size = Pt(11)
                         run.font.name = 'Microsoft JhengHei'
-                
+
                 # Apply bold formatting to header cells
                 if cell.name == 'th':
                     for paragraph in docx_cell.paragraphs:
                         for run in paragraph.runs:
                             run.font.bold = True
-                
+
                 # Add yellow highlight to cells containing "（僅供參考）"
                 if "（僅供參考）" in docx_cell.text:
                     shading_elm = OxmlElement('w:shd')
                     shading_elm.set(qn('w:fill'), "FFFF00")
                     docx_cell._tc.get_or_add_tcPr().append(shading_elm)
-    
+
     # Ensure 'List Bullet' style exists in the document
     if 'List Bullet' not in doc.styles:
         doc.styles.add_style('List Bullet', WD_STYLE_TYPE.PARAGRAPH)
         doc.styles['List Bullet'].base_style = doc.styles['Normal']
         doc.styles['List Bullet'].paragraph_format.left_indent = Inches(0.25)
         doc.styles['List Bullet'].paragraph_format.first_line_indent = Inches(-0.25)
-    
+
     # Save the document to a BytesIO object
     docx_file = io.BytesIO()
     doc.save(docx_file)
     docx_file.seek(0)
-    
+
     return docx_file
+
+def html_to_email_friendly_table(html_content):
+    soup = BeautifulSoup(html_content, 'html.parser')
+    email_content = '<table style="border-collapse: collapse; width: 100%;">'
+
+    for row in soup.find_all('tr'):
+        email_content += '<tr style="border: 1px solid #ddd;">'
+        cells = row.find_all(['th', 'td'])
+        if len(cells) == 2:
+            label = cells[0].get_text(strip=True)
+            content = cells[1].get_text(strip=True)
+
+            # 特殊處理教學活動內容及實施方式
+            if '教學活動內容及實施方式' in label:
+                email_content += f'<td style="border: 1px solid #ddd; padding: 8px; font-weight: bold;">{label}</td>'
+                email_content += '<td style="border: 1px solid #ddd; padding: 8px;">'
+                parts = ['引起動機', '發展活動', '綜合活動']
+                for part in parts:
+                    if part in content:
+                        try:
+                            section = content.split(part, 1)[1]
+                            next_part = next((p for p in parts if p in section), None)
+                            if next_part:
+                                section = section.split(next_part, 1)[0]
+                            email_content += f'<strong>{part}:</strong><br>{section.strip()}<br><br>'
+                        except IndexError:
+                            # 如果分割失敗，直接使用整個內容
+                            email_content += f'<strong>{part}:</strong><br>{content}<br><br>'
+                email_content += '</td>'
+            else:
+                email_content += f'<td style="border: 1px solid #ddd; padding: 8px; font-weight: bold;">{label}</td>'
+                email_content += f'<td style="border: 1px solid #ddd; padding: 8px;">{content}</td>'
+
+        email_content += '</tr>'
+
+    email_content += '</table>'
+    return email_content
 
 @app.route('/download_docx', methods=['POST'])
 def download_docx():
     html_content = request.json['html_content']
     docx_file = html_to_docx(html_content)
-    
+
+    # 添加 CSS 樣式來顯示表格框線
+    styled_html_content = f"""
+    <style>
+        table {{
+            border-collapse: collapse;
+            width: 100%;
+        }}
+        th, td {{
+            border: 1px solid black;
+            padding: 8px;
+            text-align: left;
+        }}
+        th {{
+            background-color: #f2f2f2;
+        }}
+    </style>
+    {html_content}
+    """
+
+    # 發送郵件
+    msg = Message('教案成功下載通知',
+                  sender='210@mail2.smes.tyc.edu.tw',
+                  recipients=['210@mail2.smes.tyc.edu.tw'])
+    msg.body = "新的教案已生成，您可以在下方查看格式化的內容。"
+    msg.html = styled_html_content  # 使用添加了樣式的 HTML 內容作為郵件正文
+
+    mail.send(msg)
+
+    # 重置文件指針位置
+    docx_file.seek(0)
+
     return send_file(
         docx_file,
         as_attachment=True,
@@ -121,6 +190,7 @@ def generate_plan():
     data = request.json
     print(f"Received request data: {data}")
 
+    # 原有的 prompt 生成邏輯...
     prompt = f'''
 請為以下教學活動生成一個完整的十二年國教教案，使用繁體中文及台灣常用詞彙：
 
@@ -130,7 +200,7 @@ def generate_plan():
 
 額外細節：{data['details']}
 
-請生成一個包含以下欄位的 HTML 表格，標題為「教學活動設計」：
+請生成一個包含以下欄位的 HTML 表格，標題為「<h3 class="lesson-plan-title">教學活動設計</h3>」：
 
 1. 領域名稱
 2. 設計者
@@ -196,16 +266,46 @@ def generate_plan():
         content = content.replace('```html', '').replace('```', '').strip()
         content = content.split('</table>')[0] + '</table>'
 
-        print(f"Processed content:\n{content}")
-
-        # Wrap the content in a div for easier styling
-        formatted_content = f"<div class='lesson-plan'>{content}</div>"
-        print(f"Final formatted content:\n{formatted_content}")
-
-        return jsonify({"success": True, "plan": formatted_content, "html_content": content})
+        # 將 HTML 內容轉換為郵件友好的表格格式
+        try:
+            email_friendly_content = html_to_email_friendly_table(content)
+        except Exception as e:
+            print(f"Error in converting HTML to email-friendly format: {str(e)}")
+            email_friendly_content = content  # 如果轉換失敗，使用原始內容
+        # 發送包含表格格式教案內容的郵件
+        subject = f"教案生成完成: {data['subject']} - {data['unit']}"
+        body = f"""
+        <html>
+        <body>
+        <p>新的教案已生成完成:</p>
+        <p>
+        教學領域: {data['subject']}<br>
+        實施年級: {data['grade']}<br>
+        單元名稱: {data['unit']}<br>
+        額外細節: {data['details']}
+        </p>
+        <p>教案內容:</p>
+        {email_friendly_content}
+        </body>
+        </html>
+        """
+        msg = Message(subject,
+                      sender='210@mail2.smes.tyc.edu.tw',
+                      recipients=['210@mail2.smes.tyc.edu.tw'])
+        msg.html = body
+        mail.send(msg)
+        return jsonify({"success": True, "plan": content, "html_content": content})
     except Exception as e:
         print(f"Error occurred: {str(e)}")
         return jsonify({"success": False, "error": str(e)}), 500
+
+# 郵件配置
+app.config['MAIL_SERVER'] = 'smtp.gmail.com'
+app.config['MAIL_PORT'] = 587
+app.config['MAIL_USE_TLS'] = True
+app.config['MAIL_USERNAME'] = '210@mail2.smes.tyc.edu.tw'  # 替換為您的 Gmail 地址
+app.config['MAIL_PASSWORD'] = 'smes4711752'  # 替換為您的應用程序密碼
+mail = Mail(app)
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000)

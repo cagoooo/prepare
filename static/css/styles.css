@@ -22,6 +22,19 @@ body {
     }
 }
 
+.header {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-bottom: 20px;
+}
+
+.school-logo {
+    width: 120px; /* 增加寬度，原來是 80px */
+    height: auto;
+    margin-right: 30px; /* 增加右邊距，原來是 20px */
+}
+
 .container {
     max-width: 800px;
     margin: 0 auto;
@@ -145,11 +158,11 @@ button[type="submit"]:hover {
     background-color: #e74c3c;
     width: 100%;
     max-width: 300px;
-    margin: 10px auto;
     display: block;
     font-size: 18px;
     padding: 12px 20px;
     box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+    margin: 20px auto;
 }
 
 #downloadBtn:hover {
@@ -164,6 +177,59 @@ button[type="submit"]:hover {
     padding: 20px;
     border-radius: 8px;
     box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    max-width: 900px;
+    margin: 20px auto;
+    text-align: center; /* 確保整個 result 區域內的內容居中 */
+}
+
+#result h3 {
+    font-size: 36px;
+    color: #2c3e50;
+    text-align: center;
+    margin-bottom: 30px;
+    text-shadow: 3px 3px 6px rgba(0,0,0,0.3);
+    background-color: #f1c40f;
+    padding: 15px;
+    border-radius: 10px;
+    display: block;
+    animation: titleFade 1.5s ease-in-out;
+    margin: 0 auto 30px; /* 添加這行來確保水平居中 */
+    max-width: 100%; /* 確保不會超出父容器 */
+}
+
+@keyframes titleFade {
+    0% {
+        opacity: 0;
+        transform: translateX(-50%) translateY(-20px);
+    }
+    100% {
+        opacity: 1;
+        transform: translateX(-50%) translateY(0);
+    }
+}
+
+#result table {
+    width: 100%;
+    border-collapse: separate;
+    border-spacing: 0;
+    border: 3px solid #2c3e50;
+    background-color: rgba(255, 255, 255, 0.9);
+    margin-bottom: 20px;
+    font-size: 14px;
+    margin: 0 auto; /* 確保表格居中 */    
+}
+
+#result table th,
+#result table td {
+    border: 1px solid #34495e;
+    padding: 12px;
+    text-align: left; /* 保持表格內容左對齊 */
+}
+#result table th {
+    background-color: #3498db;
+    color: white;
+    font-weight: bold;
+    text-transform: uppercase;
 }
 
 .loading {
@@ -193,6 +259,10 @@ button[type="submit"]:hover {
     padding: 20px;
     border-radius: 10px;
     box-shadow: 0 0 15px rgba(0,0,0,0.1);
+    max-width: 900px;  /* 設置最大寬度 */
+    margin: 0 auto;    /* 使用 auto margin 實現水平居中 */
+    overflow-x: auto;  /* 在小屏幕上允許水平滾動 */
+    text-align: center; /* 確保整個 lesson-plan 區域內的內容居中 */
 }
 
 .lesson-plan table {
@@ -203,13 +273,21 @@ button[type="submit"]:hover {
     background-color: rgba(255, 255, 255, 0.9);
     margin-bottom: 20px;
     font-size: 14px;
+    margin: 0 auto; /* 確保表格居中 */
 }
 
-.lesson-plan th,
-.lesson-plan td {
+.lesson-plan table th,
+.lesson-plan table td {
     border: 1px solid #34495e;
     padding: 12px;
-    text-align: left;
+    text-align: left; /* 保持表格內容左對齊 */
+}
+
+.lesson-plan table th {
+    background-color: #3498db;
+    color: white;
+    font-weight: bold;
+    text-transform: uppercase;
 }
 
 .lesson-plan th {
@@ -218,15 +296,43 @@ button[type="submit"]:hover {
     font-weight: bold;
     text-transform: uppercase;
 }
-
-.lesson-plan tr:nth-child(even) {
+.lesson-plan tr:nth-child(odd) {
     background-color: #ecf0f1;
 }
-
+.lesson-plan tr:nth-child(even) {
+    background-color: #f4f6f7;
+}
 .lesson-plan tr:hover {
     background-color: #e8f6ff;
 }
 
+.lesson-plan-title {
+    font-size: 36px;
+    color: #2c3e50;
+    text-align: center;
+    margin-bottom: 30px;
+    text-shadow: 3px 3px 6px rgba(0,0,0,0.3);
+    background-color: #f1c40f;
+    padding: 15px;
+    border-radius: 10px;
+    display: block;
+    animation: titleFade 1.5s ease-in-out;
+    margin: 0 auto 30px;
+    max-width: 100%;
+}
+
+@keyframes titleFade {
+    0% {
+        opacity: 0;
+        transform: translateY(-20px);
+    }
+    100% {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.lesson-plan-title,
 .lesson-plan h3 {
     font-size: 36px;
     color: #2c3e50;
@@ -236,10 +342,19 @@ button[type="submit"]:hover {
     background-color: #f1c40f;
     padding: 15px;
     border-radius: 10px;
-    display: inline-block;
-    position: relative;
-    left: 50%;
-    transform: translateX(-50%);
+    display: block;
+    animation: titleFade 1.5s ease-in-out;
+    margin: 0 auto 30px;
+    max-width: 100%;
+}
+
+@keyframes titleFade {
+    0% {
+        opacity: 0;
+    }
+    100% {
+        opacity: 1;
+    }
 }
 
 .lesson-plan p {
@@ -247,13 +362,58 @@ button[type="submit"]:hover {
     line-height: 1.6;
 }
 
+/* 響應式設計：在小屏幕上調整佈局 */
+@media screen and (max-width: 768px) {
+    .header {
+        flex-direction: column;
+    }
+
+    .school-logo {
+        width: 100px; /* 在小屏幕上稍微縮小 LOGO */
+        margin-right: 0;
+        margin-bottom: 15px;
+    }
+
+    .rainbow-text {
+        font-size: 7vw; /* 在小屏幕上增大字體大小 */
+        padding: 10px;
+        border-width: 1px;
+    }
+}
+
+/* 媒體查詢：針對更小的屏幕設備 */
+@media screen and (max-width: 480px) {
+    .rainbow-text {
+        font-size: 8vw; /* 在更小的屏幕上進一步增大字體大小 */
+        padding: 8px;
+    }
+}
+
 @media screen and (max-width: 600px) {
+    .header {
+        flex-direction: column;
+    }
+
+    .school-logo {
+        margin-right: 0;
+        margin-bottom: 10px;
+    }
     .lesson-plan table {
         font-size: 12px;
     }
     .lesson-plan th,
     .lesson-plan td {
         padding: 8px;
+    }
+    #result h3,
+    .lesson-plan-title {
+        font-size: 28px;
+        padding: 10px;
+    }
+    .rainbow-text {
+        font-size: 24px; /* 在小屏幕上減小字體大小 */
+        padding: 10px;
+        border-width: 1px;
     }
 }
 
@@ -268,26 +428,55 @@ button[type="submit"]:hover {
 }
 
 .rainbow-text {
-    background-image: linear-gradient(45deg, #990000, #006600, #000099, #996600);
-    background-size: 300%;
+    background: linear-gradient(45deg, #990000, #006600, #000099, #996600);
     -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
     background-clip: text;
     color: transparent;
-    animation: rainbow-animation 5s ease-in-out infinite;
-    font-size: 48px;
+    font-size: 5vw; /* 使用視窗寬度的百分比 */
+    min-font-size: 24px; /* 設置最小字體大小 */
+    max-font-size: 48px; /* 設置最大字體大小 */
     font-weight: bold;
     text-align: center;
-    padding: 20px;
-    text-shadow: 3px 3px 6px rgba(0,0,0,0.3);
+    padding: 15px;
     font-family: 'Arial Black', 'Microsoft JhengHei', sans-serif;
-    letter-spacing: 2px;
-    border: 4px solid;
-    border-image: linear-gradient(45deg, #990000, #006600, #000099, #996600) 1;
+    letter-spacing: 1px;
+    border: 2px solid #333;
     border-radius: 10px;
-    display: block;
-    margin: 0 auto 30px;
+    display: inline-block;
+    margin: 0;
     max-width: 100%;
+    position: relative;
+    z-index: 1;
+    word-wrap: break-word; /* 允許長單詞換行 */
+}
+
+.rainbow-text::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: linear-gradient(45deg, rgba(255,255,255,0.8), rgba(255,255,255,0.3));
+    z-index: -1;
+    border-radius: 6px;
+}
+
+.rainbow-text::after {
+    content: '教師數位備課小幫手';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-image: linear-gradient(45deg, #660000, #004400, #000066, #664400);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+    z-index: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
 }
 
 @keyframes rainbow-animation {
@@ -368,4 +557,63 @@ button[type="submit"]:hover {
 
 .generate-button:focus:not(:active)::after {
     animation: ripple 1s ease-out;
+}
+
+.lesson-plan tr:nth-child(5),
+.lesson-plan tr:nth-child(6),
+.lesson-plan tr:nth-child(8),
+.lesson-plan tr:nth-child(9),
+.lesson-plan tr:nth-child(10),
+.lesson-plan tr:nth-child(15) {
+    background-color: #fffde7; /* 淺黃色 */
+}
+
+#feedback-container {
+  position: fixed;
+  bottom: 20px;
+  right: 20px;
+  z-index: 1000;
+}
+#feedback-link {
+  display: flex;
+  align-items: center;
+  padding: 15px 25px;
+  background-color: #4169e1;
+  color: white;
+  text-decoration: none;
+  border-radius: 50px;
+  font-size: 18px;
+  font-weight: bold;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+  transition: all 0.3s ease;
+}
+#feedback-link:hover {
+  background-color: #3a5fc8;
+  transform: translateY(-3px);
+  box-shadow: 0 6px 8px rgba(0, 0, 0, 0.15);
+}
+#feedback-link:active {
+  transform: translateY(-1px);
+  box-shadow: 0 3px 4px rgba(0, 0, 0, 0.1);
+}
+.feedback-icon {
+  font-size: 24px;
+  margin-right: 10px;
+}
+.feedback-text {
+  white-space: nowrap;
+}
+@keyframes pulse {
+  0% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.05);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+#feedback-link:hover .feedback-icon {
+  animation: pulse 0.6s infinite;
 }

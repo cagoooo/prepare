@@ -4,7 +4,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
     form.addEventListener('submit', function(e) {
         e.preventDefault();
-        
+
         const submitButton = form.querySelector('button[type="submit"]');
         submitButton.disabled = true;
         submitButton.style.opacity = '0.5';
@@ -30,24 +30,22 @@ document.addEventListener('DOMContentLoaded', function() {
                 // Parse the HTML content
                 const parser = new DOMParser();
                 const doc = parser.parseFromString(data.plan, 'text/html');
-                
-                // Find all elements with class 'reference-only'
-                const referenceElements = doc.querySelectorAll('.reference-only');
-                
-                // Add line break before each '（僅供參考）' text
-                referenceElements.forEach(elem => {
-                    elem.innerHTML = '<br>' + elem.innerHTML;
-                });
-                
+
+                // Find the title and apply the new class
+                const title = doc.querySelector('h3');
+                if (title) {
+                    title.classList.add('lesson-plan-title');
+                }
                 // Set the innerHTML of the resultDiv
                 resultDiv.innerHTML = doc.body.innerHTML;
-                
-                // Add download button with id 'downloadBtn'
+
+                // Add download button
                 const downloadBtn = document.createElement('button');
                 downloadBtn.textContent = '下載 Word 檔案';
                 downloadBtn.id = 'downloadBtn';
                 downloadBtn.onclick = () => downloadDocx(data.html_content);
                 resultDiv.appendChild(downloadBtn);
+
             } else {
                 resultDiv.innerHTML = `<p>生成教案時出錯：${data.error}</p>`;
             }

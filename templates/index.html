@@ -3,31 +3,49 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>十二年國教教案生成站</title>
+    <title>桃園市石門國小數位備課小幫手</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
+
+    <!-- 添加以下行來設置 favicon -->
+    <link rel="icon" type="image/x-icon" href="{{ url_for('static', filename='write.ico') }}">
+    
 </head>
 <body>
-    <h1 class="rainbow-text">十二年國教教案生成站</h1>
-    <form id="lesson-plan-form">
-        <div>
-            <label for="subject">教學領域(必填)：</label>
-            <input type="text" id="subject" name="subject" required>
-        </div>
-        <div>
-            <label for="grade">實施年級(必填)：</label>
-            <input type="text" id="grade" name="grade" required>
-        </div>
-        <div>
-            <label for="unit">單元名稱(必填)：</label>
-            <input type="text" id="unit" name="unit" required>
-        </div>
-        <div>
-            <label for="details">額外細節(選填)：</label>
-            <textarea id="details" name="details" rows="4"></textarea>
-        </div>
-        <button type="submit">生成教案</button>
-    </form>
-    <div id="result"></div>
+    <div class="header">
+    <img src="{{ url_for('static', filename='images/logo.png') }}" alt="學校 Logo" class="school-logo">
+    <h1 class="rainbow-text">教師數位備課小幫手</h1>
+    </div>
+    <div class="container">
+        <form id="lesson-plan-form">
+            <div class="form-group">
+                <label for="subject" class="animated-label">教學領域(必填)：</label>
+                <input type="text" id="subject" name="subject" class="animated-input" required>
+            </div>
+            <div class="form-group">
+                <label for="grade" class="animated-label">實施年級(必填)：</label>
+                <input type="text" id="grade" name="grade" class="animated-input" required>
+            </div>
+            <div class="form-group">
+                <label for="unit" class="animated-label">單元名稱(必填)：</label>
+                <input type="text" id="unit" name="unit" class="animated-input" required>
+            </div>
+            <div class="form-group">
+                <label for="details" class="animated-label">額外細節(選填～填了可大幅增強產出結果！)：</label>
+                <textarea id="details" name="details" rows="4" class="animated-input"></textarea>
+            </div>
+            <button type="submit" class="generate-button">激發教案靈感(供參考)</button>
+        </form>
+    </div>
+    <div id="result" class="lesson-plan">
+        <h3>教學活動設計</h3>
+        <!-- The generated content will be inserted here -->
+    </div>
+    <div id="feedback-container">
+        <a href="https://forms.gle/NUQK73gFNJAGQir5A" target="_blank" id="feedback-link">
+          <span class="feedback-icon">📝</span>
+          <span class="feedback-text">歡迎提供使用回饋</span>
+        </a>
+      </div>
     <script src="{{ url_for('static', filename='js/script.js') }}"></script>
 </body>
 </html>
