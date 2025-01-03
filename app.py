@@ -14,16 +14,21 @@ from flask_mail import Mail, Message
 app = Flask(__name__)
 
 OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY")
+openai_client = None
 
-if not OPENAI_API_KEY:
-    print("Error: OPENAI_API_KEY is not set in environment variables")
-    openai_client = None
-else:
+def init_openai():
+    global openai_client
+    if not OPENAI_API_KEY:
+        print("Error: OPENAI_API_KEY is not set in environment variables")
+        return None
     try:
         openai_client = OpenAI(api_key=OPENAI_API_KEY)
+        return openai_client
     except Exception as e:
         print(f"Error initializing OpenAI client: {str(e)}")
-        openai_client = None
+        return None
+
+init_openai()
 
 @app.route('/')
 def index():
