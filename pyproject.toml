@@ -16,6 +16,7 @@ python-docx = "0.8.11"
 beautifulsoup4 = "^4.12.3"
 flask-mail = "0.9.1"
 docx = "^0.2.4"
+gunicorn = "^23.0.0"
 
 
 [build-system]
