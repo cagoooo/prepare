@@ -7,8 +7,7 @@ channel = "stable-24_05"
 run = ["python3", "main.py"]
 
 [deployment]
-run = ["sh", "-c", "gunicorn app:app"]
-deploymentTarget = "cloudrun"
+run = ["sh", "-c", "python -m gunicorn app:app --bind 0.0.0.0:8080"]
 deploymentTarget = "cloudrun"
 
 [[ports]]
