@@ -106,6 +106,8 @@ document.addEventListener('DOMContentLoaded', function () {
                     // Set the innerHTML of the resultDiv
                     resultDiv.innerHTML = doc.body.innerHTML;
                     resultDiv.style.display = 'block';
+                    // 自動捲動至結果區域，提升 UX
+                    resultDiv.scrollIntoView({ behavior: 'smooth', block: 'start' });
 
                     // Add download button
                     const downloadBtn = document.createElement('button');
