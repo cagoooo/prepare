@@ -1,15 +1,14 @@
 const { onRequest } = require("firebase-functions/v2/https");
-require("dotenv").config();
+const { defineSecret } = require("firebase-functions/params");
 const cors = require("cors")({ origin: true });
 const { GoogleGenAI } = require("@google/genai");
 const line = require("@line/bot-sdk");
 const HTMLtoDOCX = require("html-to-docx");
 
-// ─── 金鑰讀取：本地用 functions/.env，CI/CD 用 GitHub Secrets 注入環境變數 ────────
-// 說明：此檔式不需要符費計畫 Secret Manager
-const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
-const LINE_CHANNEL_ACCESS_TOKEN = process.env.LINE_CHANNEL_ACCESS_TOKEN;
-const LINE_USER_ID = process.env.LINE_USER_ID;
+// ─── Firebase Secret Manager (已升級 Blaze 方案，金鑰安全云端加密儲存) ───────
+const GEMINI_API_KEY = defineSecret("GEMINI_API_KEY");
+const LINE_CHANNEL_ACCESS_TOKEN = defineSecret("LINE_CHANNEL_ACCESS_TOKEN");
+const LINE_USER_ID = defineSecret("LINE_USER_ID");
 
 // ─── 建立 LINE Flex Message ─────────────────────────────────────────────────
 function createFlexMessage(data, bodyContents) {
@@ -98,7 +97,7 @@ function parseHtmlToFlexBody(htmlContent) {
 
 // ─── generatePlan Cloud Function ────────────────────────────────────────────
 exports.generatePlan = onRequest(
-    { region: "asia-east1" },
+    { secrets: [GEMINI_API_KEY, LINE_CHANNEL_ACCESS_TOKEN, LINE_USER_ID], region: "asia-east1" },
     async (req, res) => {
         cors(req, res, async () => {
             if (req.method !== "POST") {
@@ -137,7 +136,7 @@ exports.generatePlan = onRequest(
 每個欄位的說明都要詳細完整，並根據台灣教育環境設計符合實際教學的內容。`;
 
             try {
-                const ai = new GoogleGenAI({ apiKey: GEMINI_API_KEY });
+                const ai = new GoogleGenAI({ apiKey: GEMINI_API_KEY.value() });
                 const response = await ai.models.generateContent({
                     model: "gemini-2.5-flash-lite",
                     contents: prompt,
@@ -149,8 +148,8 @@ exports.generatePlan = onRequest(
 
                 // ── LINE Flex 通知 ──
                 try {
-                    const lineToken = LINE_CHANNEL_ACCESS_TOKEN;
-                    const lineUserId = LINE_USER_ID;
+                    const lineToken = LINE_CHANNEL_ACCESS_TOKEN.value();
+                    const lineUserId = LINE_USER_ID.value();
                     if (lineToken && lineUserId) {
                         const client = new line.messagingApi.MessagingApiClient({ channelAccessToken: lineToken });
                         const flexBody = parseHtmlToFlexBody(content);
