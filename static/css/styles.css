@@ -112,10 +112,10 @@ body {
     }
 }
 
-#top-right-button {
+#bottom-left-button {
     position: fixed;
-    top: 20px;
-    right: 20px;
+    bottom: 20px;
+    left: 20px;
     z-index: 1000;
 }
 
@@ -139,6 +139,30 @@ body {
 #bee-link:hover {
     transform: translateY(-2px);
     box-shadow: 0 6px 20px rgba(0, 0, 0, 0.4);
+}
+
+.feedback-icon::before {
+    content: '🐝';
+}
+
+/* 行動端極簡化：隱藏文字，僅顯示蜜蜂圖示 */
+@media screen and (max-width: 600px) {
+    #bee-link {
+        padding: 12px;
+        border-radius: 50%;
+        width: 50px;
+        height: 50px;
+        justify-content: center;
+    }
+
+    #bee-link .feedback-text {
+        display: none;
+    }
+
+    #bee-link .feedback-icon {
+        margin-right: 0;
+        font-size: 24px;
+    }
 }
 
 @keyframes gradient {
