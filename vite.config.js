@@ -1,6 +1,6 @@
 import { defineConfig } from 'vite';
 
 export default defineConfig({
-    // 為了 GitHub Pages 部署，必須設定 base 為 './'，解決子目錄相對路徑問題
-    base: './',
+    // 為了 GitHub Pages 部署，建議設定明確的子目錄路徑 `/prepare/`
+    base: '/prepare/',
 });
