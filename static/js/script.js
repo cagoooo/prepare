@@ -1,8 +1,65 @@
-document.addEventListener('DOMContentLoaded', function() {
+// API 端點動態切換：本地開發 vs 正式環境
+// 正式環境下，會將此檔案內的 VITE_FUNCTIONS_BASE 替換為實際 URL
+const API_BASE =
+    typeof import.meta !== 'undefined' && typeof import.meta.env !== 'undefined'
+        ? (import.meta.env.VITE_FUNCTIONS_BASE || 'http://127.0.0.1:5001/teacher-c571b/asia-east1')
+        : 'http://127.0.0.1:5001/teacher-c571b/asia-east1';
+
+document.addEventListener('DOMContentLoaded', function () {
+    // 解決開發環境緩存問題：註銷所有 Service Worker (僅限 localhost)
+    if ('serviceWorker' in navigator) {
+        if (location.hostname === 'localhost' || location.hostname === '127.0.0.1') {
+            navigator.serviceWorker.getRegistrations().then(function (registrations) {
+                for (let registration of registrations) {
+                    registration.unregister();
+                    console.log('Service Worker 已註銷，確保載入最新版本 (localhost環境)。');
+                }
+            });
+        }
+    }
+
     const form = document.getElementById('lesson-plan-form');
     const resultDiv = document.getElementById('result');
 
-    form.addEventListener('submit', function(e) {
+    let progressInterval;
+
+    function updateProgress(percent) {
+        const fill = document.getElementById('progress-fill');
+        const text = document.getElementById('progress-percent');
+        if (fill && text) {
+            fill.style.width = percent + '%';
+            text.textContent = Math.round(percent) + '%';
+        }
+    }
+
+    function startSmartProgress() {
+        let currentProgress = 0;
+        updateProgress(0);
+
+        // 模擬進度邏輯：前快後慢
+        progressInterval = setInterval(() => {
+            if (currentProgress < 30) {
+                currentProgress += Math.random() * 5; // 初期快速
+            } else if (currentProgress < 70) {
+                currentProgress += Math.random() * 2; // 中期穩定
+            } else if (currentProgress < 95) {
+                currentProgress += Math.random() * 0.5; // 後期緩慢 (等待 API)
+            }
+
+            if (currentProgress > 98) currentProgress = 98;
+            updateProgress(currentProgress);
+        }, 300);
+    }
+
+    function finishProgress() {
+        clearInterval(progressInterval);
+        updateProgress(100);
+        setTimeout(() => {
+            document.getElementById('progress-container').style.display = 'none';
+        }, 500);
+    }
+
+    form.addEventListener('submit', function (e) {
         e.preventDefault();
 
         const submitButton = form.querySelector('button[type="submit"]');
@@ -15,73 +72,90 @@ document.addEventListener('DOMContentLoaded', function() {
         const unit = document.getElementById('unit').value;
         const details = document.getElementById('details').value;
 
-        resultDiv.innerHTML = '<p class="loading">正在生成教案，請稍候...</p>';
+        // 顯示進度區域，隱藏結果區域
+        const progressContainer = document.getElementById('progress-container');
+        if (progressContainer) {
+            progressContainer.style.display = 'block';
+            // 自動捲動至進度條，提升 UX
+            progressContainer.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+        if (resultDiv) {
+            resultDiv.style.display = 'none';
+            resultDiv.innerHTML = '';
+        }
 
-        fetch('/generate_plan', {
+        startSmartProgress();
+
+        fetch(`${API_BASE}/generatePlan`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
             },
             body: JSON.stringify({ subject, grade, unit, details }),
         })
-        .then(response => response.json())
-        .then(data => {
-            if (data.success) {
-                // Parse the HTML content
-                const parser = new DOMParser();
-                const doc = parser.parseFromString(data.plan, 'text/html');
+            .then(response => response.json())
+            .then(data => {
+                finishProgress();
+                if (data.success) {
+                    // Parse the HTML content
+                    const parser = new DOMParser();
+                    const doc = parser.parseFromString(data.plan, 'text/html');
 
-                // Find the title and apply the new class
-                const title = doc.querySelector('h3');
-                if (title) {
-                    title.classList.add('lesson-plan-title');
+                    // Find the title and apply the new class
+                    const title = doc.querySelector('h3');
+                    if (title) {
+                        title.classList.add('lesson-plan-title');
+                    }
+                    // Set the innerHTML of the resultDiv
+                    resultDiv.innerHTML = doc.body.innerHTML;
+                    resultDiv.style.display = 'block';
+
+                    // Add download button
+                    const downloadBtn = document.createElement('button');
+                    downloadBtn.textContent = '下載 Word 檔案';
+                    downloadBtn.id = 'downloadBtn';
+                    downloadBtn.onclick = () => downloadDocx(data.html_content);
+                    resultDiv.appendChild(downloadBtn);
+
+                } else {
+                    resultDiv.style.display = 'block';
+                    resultDiv.innerHTML = `<p>生成教案時出錯：${data.error}</p>`;
                 }
-                // Set the innerHTML of the resultDiv
-                resultDiv.innerHTML = doc.body.innerHTML;
-
-                // Add download button
-                const downloadBtn = document.createElement('button');
-                downloadBtn.textContent = '下載 Word 檔案';
-                downloadBtn.id = 'downloadBtn';
-                downloadBtn.onclick = () => downloadDocx(data.html_content);
-                resultDiv.appendChild(downloadBtn);
-
-            } else {
-                resultDiv.innerHTML = `<p>生成教案時出錯：${data.error}</p>`;
-            }
-            submitButton.disabled = false;
-            submitButton.style.opacity = '1';
-            submitButton.style.cursor = 'pointer';
-        })
-        .catch(error => {
-            resultDiv.innerHTML = `<p>請求出錯：${error}</p>`;
-            submitButton.disabled = false;
-            submitButton.style.opacity = '1';
-            submitButton.style.cursor = 'pointer';
-        });
+                submitButton.disabled = false;
+                submitButton.style.opacity = '1';
+                submitButton.style.cursor = 'pointer';
+            })
+            .catch(error => {
+                finishProgress();
+                resultDiv.style.display = 'block';
+                resultDiv.innerHTML = `<p>請求出錯：${error}</p>`;
+                submitButton.disabled = false;
+                submitButton.style.opacity = '1';
+                submitButton.style.cursor = 'pointer';
+            });
     });
 });
 
 function downloadDocx(htmlContent) {
-    fetch('/download_docx', {
+    fetch(`${API_BASE}/downloadDocx`, {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
         },
         body: JSON.stringify({ html_content: htmlContent }),
     })
-    .then(response => response.blob())
-    .then(blob => {
-        const url = window.URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.style.display = 'none';
-        a.href = url;
-        a.download = 'lesson_plan.docx';
-        document.body.appendChild(a);
-        a.click();
-        window.URL.revokeObjectURL(url);
-    })
-    .catch(error => {
-        console.error('Error downloading file:', error);
-    });
+        .then(response => response.blob())
+        .then(blob => {
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.style.display = 'none';
+            a.href = url;
+            a.download = 'lesson_plan.docx';
+            document.body.appendChild(a);
+            a.click();
+            window.URL.revokeObjectURL(url);
+        })
+        .catch(error => {
+            console.error('Error downloading file:', error);
+        });
 }

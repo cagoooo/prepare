@@ -1,7 +1,8 @@
 import os
-from flask import Flask, render_template, request, jsonify, send_file
-from openai import OpenAI
 import io
+from flask import Flask, render_template, request, jsonify, send_file
+from google import genai
+from dotenv import load_dotenv
 from docx import Document
 from docx.shared import Inches, Pt
 from docx.enum.table import WD_TABLE_ALIGNMENT
@@ -9,17 +10,32 @@ from docx.oxml import OxmlElement
 from docx.oxml.ns import qn
 from bs4 import BeautifulSoup
 from docx.enum.style import WD_STYLE_TYPE
-from flask_mail import Mail, Message
+import traceback
+from linebot import LineBotApi
+from linebot.models import TextSendMessage, FlexSendMessage
+
+
+# 載入環境變數
+load_dotenv()
 
 app = Flask(__name__)
+# 診斷路徑
+import os
+print(f"DEBUG: App file: {__file__}")
+print(f"DEBUG: CWD: {os.getcwd()}")
+print(f"DEBUG: Template folder: {app.template_folder}")
 
-OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY")
+# 停用模板緩存
+app.config['TEMPLATES_AUTO_RELOAD'] = True
+app.config['SEND_FILE_MAX_AGE_DEFAULT'] = 0
 
-if not OPENAI_API_KEY:
-    print("Warning: OPENAI_API_KEY is not set. Some features may not work.")
-    openai_client = None
+# 配置 Gemini API
+GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
+if not GEMINI_API_KEY:
+    print("Warning: GEMINI_API_KEY is not set. AI features will not work.")
+    client = None
 else:
-    openai_client = OpenAI(api_key=OPENAI_API_KEY)
+    client = genai.Client(api_key=GEMINI_API_KEY)
 
 @app.route('/')
 def index():
@@ -139,58 +155,158 @@ def html_to_email_friendly_table(html_content):
     email_content += '</table>'
     return email_content
 
+def create_lesson_plan_flex_message(data, html_content):
+    soup = BeautifulSoup(html_content, 'html.parser')
+    table = soup.find('table')
+    
+    body_contents = []
+    
+    if table:
+        rows = table.find_all('tr')
+        for row in rows:
+            cells = row.find_all(['th', 'td'])
+            if len(cells) >= 2:
+                key = cells[0].get_text(strip=True).replace('（僅供參考）', '')
+                # 替換 <br> 為換行符
+                for br in cells[1].find_all('br'):
+                    br.replace_with('\n')
+                value = cells[1].get_text(strip=True)
+                
+                if not value:
+                    continue
+                
+                # LINE 文字組件字數限制防禦
+                if len(value) > 1900:
+                    value = value[:1900] + "...\n(內容過長，請至網頁或 Word 檔查看完整內容)"
+                
+                body_contents.append({
+                    "type": "box",
+                    "layout": "vertical",
+                    "margin": "lg",
+                    "spacing": "sm",
+                    "contents": [
+                        {
+                            "type": "text",
+                            "text": f"📌 {key}",
+                            "weight": "bold",
+                            "color": "#1DB446",
+                            "size": "sm",
+                            "wrap": True
+                        },
+                        {
+                            "type": "text",
+                            "text": value,
+                            "wrap": True,
+                            "size": "sm",
+                            "color": "#333333"
+                        }
+                    ]
+                })
+                body_contents.append({
+                    "type": "separator",
+                    "margin": "lg"
+                })
+        
+        # 移除最後一個分隔線
+        if body_contents and body_contents[-1]["type"] == "separator":
+            body_contents.pop()
+
+    flex_dict = {
+      "type": "bubble",
+      "size": "giga",
+      "header": {
+        "type": "box",
+        "layout": "vertical",
+        "backgroundColor": "#2C3E50",
+        "paddingAll": "20px",
+        "contents": [
+          {
+            "type": "text",
+            "text": "🎓 教師數位備課小幫手",
+            "color": "#FFFFFF",
+            "weight": "bold",
+            "size": "sm"
+          },
+          {
+            "type": "text",
+            "text": f"{data['subject']} - {data['unit']}",
+            "color": "#F39C12",
+            "weight": "bold",
+            "size": "xl",
+            "margin": "md",
+            "wrap": True
+          },
+          {
+            "type": "text",
+            "text": f"適用年級：{data['grade']}",
+            "color": "#BDC3C7",
+            "size": "xs",
+            "margin": "sm"
+          }
+        ]
+      },
+      "body": {
+        "type": "box",
+        "layout": "vertical",
+        "backgroundColor": "#F8F9F9",
+        "paddingAll": "20px",
+        "contents": body_contents
+      }
+    }
+    
+    return flex_dict
+
 @app.route('/download_docx', methods=['POST'])
 def download_docx():
-    html_content = request.json['html_content']
-    docx_file = html_to_docx(html_content)
+    try:
+        html_content = request.json['html_content']
+        docx_file = html_to_docx(html_content)
 
-    # 添加 CSS 樣式來顯示表格框線
-    styled_html_content = f"""
-    <style>
-        table {{
-            border-collapse: collapse;
-            width: 100%;
-        }}
-        th, td {{
-            border: 1px solid black;
-            padding: 8px;
-            text-align: left;
-        }}
-        th {{
-            background-color: #f2f2f2;
-        }}
-    </style>
-    {html_content}
-    """
+        # 添加 CSS 樣式來顯示表格框線
+        styled_html_content = f"""
+        <style>
+            table {{ border-collapse: collapse; width: 100%; }}
+            th, td {{ border: 1px solid black; padding: 8px; text-align: left; }}
+            th {{ background-color: #f2f2f2; }}
+        </style>
+        {html_content}
+        """
 
-    # 發送郵件
-    msg = Message('教案成功下載通知',
-                  sender='210@mail2.smes.tyc.edu.tw',
-                  recipients=['210@mail2.smes.tyc.edu.tw'])
-    msg.body = "新的教案已生成，您可以在下方查看格式化的內容。"
-    msg.html = styled_html_content  # 使用添加了樣式的 HTML 內容作為郵件正文
+        # 建立郵件物件
+        msg = Message('教案成功下載通知',
+                      sender='210@mail2.smes.tyc.edu.tw',
+                      recipients=['210@mail2.smes.tyc.edu.tw'])
+        msg.body = "新的教案已生成，您可以在下方查看格式化的內容。"
+        msg.html = styled_html_content
 
-    mail.send(msg)
+        # 發送郵件（使用獨立 try-except 隔離）
+        try:
+            mail.send(msg)
+        except Exception as mail_err:
+            print(f"Notification mail send failed: {str(mail_err)}")
 
-    # 重置文件指針位置
-    docx_file.seek(0)
+        # 重置文件指針位置
+        docx_file.seek(0)
 
-    return send_file(
-        docx_file,
-        as_attachment=True,
-        download_name='lesson_plan.docx',
-        mimetype='application/vnd.openxmlformats-officedocument.wordprocessingml.document'
-    )
+        return send_file(
+            docx_file,
+            as_attachment=True,
+            download_name='lesson_plan.docx',
+            mimetype='application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+        )
+    except Exception as e:
+        traceback.print_exc()
+        return jsonify({"success": False, "error": str(e)}), 500
 
 @app.route('/generate_plan', methods=['POST'])
 def generate_plan():
-    if not openai_client:
-        return jsonify({"success": False, "error": "OpenAI API key is not set"}), 500
+    if not GEMINI_API_KEY:
+        return jsonify({"success": False, "error": "Gemini API key is not set"}), 500
 
     data = request.json
-    print(f"Received request data: {data}")
+    # 移除可能導致編碼錯誤的 print
+    # print(f"Received request data: {data}")
 
-    # 原有的 prompt 生成邏輯...
     prompt = f'''
 請為以下教學活動生成一個完整的十二年國教教案，使用繁體中文及台灣常用詞彙：
 
@@ -211,7 +327,7 @@ def generate_plan():
 7. 核心素養呼應說明
 8. 學習重點-學習表現<span class="reference-only">（僅供參考）</span>
 9. 學習重點-學習內容<span class="reference-only">（僅供參考）</span>
-10. 議題融入-實質內涵<span class="reference-only">（僅供參考）</span>
+10. 議題融入-實質內容<span class="reference-only">（僅供參考）</span>
 11. 議題融入-所融入之學習重點
 12. 教材來源
 13. 教學資源-教師（請提供多樣化的資源，如教學影片、線上工具、實體教具等）
@@ -244,69 +360,64 @@ def generate_plan():
    - 說明如何幫助學生整合所學知識
    - 提供創意的總結方式，如：概念圖、角色扮演、辯論等
 
-請確保每個部分都有充分且具體的描述，包括時間分配，使教師能夠輕鬆理解並執行這個教案。請使用台灣教育常用的詞彙和表達方式，並融入適當的教育理念和創新教學方法。
+請確保每個部分都有充分且具體的描述，包括時間分配，使教師能夠輕鬆理解並執行這個教案。請使用台灣教育常用的詞彙與表達方式，並融入適當的教育理念和創新教學方法。
 '''
 
-    print(f"Generated prompt:\n{prompt}")
+    # 移除可能導致編碼錯誤的 print
+    # print(f"Generated prompt:\n{prompt}")
 
     try:
-        print("Sending request to OpenAI API...")
-        response = openai_client.chat.completions.create(
-            model="gpt-4o-mini",
-            messages=[{"role": "user", "content": prompt}],
-            response_format={"type": "text"}
+        print("Sending request to Gemini API...")
+        response = client.models.generate_content(
+            model="gemini-2.5-flash-lite",
+            contents=prompt
         )
-        print(f"Received response from OpenAI API: {response}")
-
-        content = response.choices[0].message.content
+        content = response.text
         if not content:
-            raise ValueError("OpenAI returned an empty response.")
+            raise ValueError("Gemini returned an empty response.")
 
-        # 移除 HTML 註釋和總結句
+        # 移除 Markdown 標記
         content = content.replace('```html', '').replace('```', '').strip()
-        content = content.split('</table>')[0] + '</table>'
+        if '</table>' in content:
+            content = content.split('</table>')[0] + '</table>'
 
         # 將 HTML 內容轉換為郵件友好的表格格式
         try:
             email_friendly_content = html_to_email_friendly_table(content)
         except Exception as e:
             print(f"Error in converting HTML to email-friendly format: {str(e)}")
-            email_friendly_content = content  # 如果轉換失敗，使用原始內容
-        # 發送包含表格格式教案內容的郵件
-        subject = f"教案生成完成: {data['subject']} - {data['unit']}"
-        body = f"""
-        <html>
-        <body>
-        <p>新的教案已生成完成:</p>
-        <p>
-        教學領域: {data['subject']}<br>
-        實施年級: {data['grade']}<br>
-        單元名稱: {data['unit']}<br>
-        額外細節: {data['details']}
-        </p>
-        <p>教案內容:</p>
-        {email_friendly_content}
-        </body>
-        </html>
-        """
-        msg = Message(subject,
-                      sender='210@mail2.smes.tyc.edu.tw',
-                      recipients=['210@mail2.smes.tyc.edu.tw'])
-        msg.html = body
-        mail.send(msg)
+            email_friendly_content = content 
+        
+        # LINE 通知邏輯
+        if line_bot_api and LINE_USER_ID:
+            try:
+                flex_content = create_lesson_plan_flex_message(data, content)
+                line_bot_api.push_message(
+                    LINE_USER_ID, 
+                    FlexSendMessage(
+                        alt_text=f"✨ 教案生成成功！({data['subject']} - {data['unit']})",
+                        contents=flex_content
+                    )
+                )
+                print("LINE Flex notification sent successfully.")
+            except Exception as line_err:
+                print(f"LINE notification failed: {str(line_err)}")
+            
         return jsonify({"success": True, "plan": content, "html_content": content})
     except Exception as e:
+        traceback.print_exc()
         print(f"Error occurred: {str(e)}")
         return jsonify({"success": False, "error": str(e)}), 500
 
-# 郵件配置
-app.config['MAIL_SERVER'] = 'smtp.gmail.com'
-app.config['MAIL_PORT'] = 587
-app.config['MAIL_USE_TLS'] = True
-app.config['MAIL_USERNAME'] = '210@mail2.smes.tyc.edu.tw'  # 替換為您的 Gmail 地址
-app.config['MAIL_PASSWORD'] = 'smes4711752'  # 替換為您的應用程序密碼
-mail = Mail(app)
+# LINE API 配置
+LINE_CHANNEL_ACCESS_TOKEN = os.environ.get("LINE_CHANNEL_ACCESS_TOKEN")
+LINE_USER_ID = os.environ.get("LINE_USER_ID")
+
+if LINE_CHANNEL_ACCESS_TOKEN:
+    line_bot_api = LineBotApi(LINE_CHANNEL_ACCESS_TOKEN)
+else:
+    print("Warning: LINE_CHANNEL_ACCESS_TOKEN is not set. LINE notifications will not work.")
+    line_bot_api = None
 
 if __name__ == '__main__':
-    port = int(os.environ.get('PORT', 8080))
-    app.run(host='0.0.0.0', port=port, debug=False, threaded=True)
+    app.run(host='0.0.0.0', port=8080, debug=False, threaded=True)

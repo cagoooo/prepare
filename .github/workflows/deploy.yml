@@ -1,0 +1,68 @@
+name: 🚀 部署至 GitHub Pages + Firebase Functions
+
+on:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: write  # 必填項目：推送至 gh-pages 分支需要此權限
+
+jobs:
+  # ─── Job 1: 前端建置並部署至 GitHub Pages ──────────────────────────────────
+  deploy-frontend:
+    name: 前端建置 & 部署 GitHub Pages
+    runs-on: ubuntu-latest
+    steps:
+      - name: 取出程式碼
+        uses: actions/checkout@v4
+
+      - name: 設定 Node.js 環境
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+
+      - name: 安裝前端相依套件
+        run: npm install
+
+      - name: Vite 建置 (注入 Firebase Functions 正式 URL)
+        run: npm run build
+        env:
+          # 請在 GitHub Repository Secrets 中新增此金鑰
+          # 值為 Firebase Functions 部署後的完整 base URL
+          # 例如: https://asia-east1-teacher-c571b.cloudfunctions.net
+          VITE_FUNCTIONS_BASE: ${{ secrets.VITE_FUNCTIONS_BASE }}
+
+      - name: 部署至 gh-pages
+        uses: peaceiris/actions-gh-pages@v4
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./dist
+
+  # ─── Job 2: 部署 Firebase Cloud Functions ──────────────────────────────────
+  deploy-functions:
+    name: 部署 Firebase Functions
+    runs-on: ubuntu-latest
+    # 僅在 functions/ 目錄有變更時才觸發
+    steps:
+      - name: 取出程式碼
+        uses: actions/checkout@v4
+
+      - name: 設定 Node.js 環境
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: 安裝 functions 相依套件
+        run: npm install
+        working-directory: ./functions
+
+      - name: 部署 Firebase Cloud Functions
+        uses: w9jds/firebase-action@master
+        with:
+          args: deploy --only functions
+        env:
+          # 請在 GitHub Repository Secrets 中新增 FIREBASE_TOKEN
+          # 取得方式：在本地執行 firebase login:ci
+          FIREBASE_TOKEN: ${{ secrets.FIREBASE_TOKEN }}

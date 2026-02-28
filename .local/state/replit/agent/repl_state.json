@@ -1,0 +1,1 @@
+{"repl_description":"一個專為十二年國教教師設計的AI教案生成網頁應用，使用Flask和Vanilla JavaScript開發，整合ChatGPT-4o-mini API智能生成客製化教案內容。網頁包含教案生成功能和設計者資訊展示。\n\n技術棧：\n- 後端：Flask (Python)\n- 前端：Vanilla JavaScript\n- AI整合：OpenAI ChatGPT-4o-mini API\n- UI元素：廣告按鈕、設計者資訊連結","repl_description_state":"DESCRIPTION_APPROVED","repl_stack":null,"stack_rules":null}

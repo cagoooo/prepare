@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>桃園市石門國小數位備課小幫手</title>
+    <link rel="stylesheet" href="./static/css/styles.css">
+    <link rel="icon" type="image/x-icon" href="./static/write.ico">
+</head>
+
+<body>
+    <div class="header">
+        <img src="./static/images/logo.png" alt="學校 Logo" class="school-logo">
+        <h1 class="rainbow-text">教師數位備課小幫手</h1>
+    </div>
+    <div class="container">
+        <form id="lesson-plan-form">
+            <div class="form-group">
+                <label for="subject" class="animated-label">教學領域(必填)：</label>
+                <input type="text" id="subject" name="subject" class="animated-input" required>
+            </div>
+            <div class="form-group">
+                <label for="grade" class="animated-label">實施年級(必填)：</label>
+                <input type="text" id="grade" name="grade" class="animated-input" required>
+            </div>
+            <div class="form-group">
+                <label for="unit" class="animated-label">單元名稱(必填)：</label>
+                <input type="text" id="unit" name="unit" class="animated-input" required>
+            </div>
+            <div class="form-group">
+                <label for="details" class="animated-label">額外細節(選填～填了可大幅增強產出結果！)：</label>
+                <textarea id="details" name="details" rows="4" class="animated-input"></textarea>
+            </div>
+            <button type="submit" class="generate-button">激發教案靈感(供參考)</button>
+        </form>
+    </div>
+
+    <!-- 進度條容器 -->
+    <div id="progress-container" class="glass-loading" style="display: none;">
+        <div class="loading-content">
+            <div class="spinner"></div>
+            <p class="loading-text">老師請稍侯，阿凱正在努力為您生成優質教案...</p>
+            <div class="progress-wrapper">
+                <div id="progress-fill" class="progress-fill"></div>
+            </div>
+            <p id="progress-percent" class="progress-percent">0%</p>
+        </div>
+    </div>
+
+    <div id="result" class="lesson-plan" style="display: none;">
+        <h3>教學活動設計</h3>
+        <!-- The generated content will be inserted here -->
+    </div>
+    <div id="top-right-button">
+        <a href="https://lin.ee/TWuFLXo" target="_blank" id="bee-link">
+            <span class="feedback-icon"></span>
+            <span class="feedback-text">點『石』成金🐝(評語優化)</span>
+        </a>
+    </div>
+    <div id="feedback-container">
+        <a href="https://forms.gle/NUQK73gFNJAGQir5A" target="_blank" id="feedback-link">
+            <span class="feedback-icon">📝</span>
+            <span class="feedback-text">歡迎提供使用回饋</span>
+        </a>
+    </div>
+    <footer
+        style="text-align: center; padding: 20px; margin-top: 20px; background-color: rgba(255, 255, 255, 0.8); border-radius: 10px; box-shadow: 0 0 10px rgba(0,0,0,0.1);">
+        <div class="footer-content">
+            <div class="social-links">
+                <a href="https://www.facebook.com/tycsmes" target="_blank" class="social-link" title="Facebook">
+                    <span class="social-icon">📱</span>
+                </a>
+                <a href="https://www.youtube.com/@Akailao" target="_blank" class="social-link" title="YouTube">
+                    <span class="social-icon">📺</span>
+                </a>
+            </div>
+            <div class="designer-credit">
+                Designed by <a href="https://www.smes.tyc.edu.tw/modules/tadnews/page.php?ncsn=11&nsn=16#a5"
+                    target="_blank"
+                    style="color: #007bff; text-decoration: none; font-weight: bold; transition: color 0.3s ease;">阿凱老師</a>
+            </div>
+        </div>
+    </footer>
+    <script src="./static/js/script.js"></script>
+</body>
+
+</html>
