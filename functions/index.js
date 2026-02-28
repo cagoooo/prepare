@@ -36,7 +36,8 @@ function createFlexMessage(data, bodyContents, downloadUrl) {
         body: {
             type: "box",
             layout: "vertical",
-            spacing: "md",
+            spacing: "lg",
+            paddingAll: "xl",
             contents: bodyContents
         },
         footer: {
@@ -124,14 +125,16 @@ function parseHtmlToFlexBody(htmlContent) {
             bodyContents.push({
                 type: "box",
                 layout: "vertical",
-                margin: "md",
+                margin: "lg",
+                spacing: "sm",
                 contents: [
                     {
                         type: "text",
                         text: `${emoji} ${rawKey}`,
                         weight: "bold",
                         color: "#0367D3",
-                        size: "sm"
+                        size: "md",
+                        wrap: true
                     },
                     {
                         type: "text",
@@ -139,11 +142,13 @@ function parseHtmlToFlexBody(htmlContent) {
                         wrap: true,
                         size: "sm",
                         color: "#333333",
-                        margin: "xs"
+                        margin: "sm",
+                        lineSpacing: "1.5"
                     },
                     {
                         type: "separator",
-                        margin: "md"
+                        margin: "lg",
+                        color: "#EEEEEE"
                     }
                 ]
             });
