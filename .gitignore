@@ -23,4 +23,19 @@ functions/.env
 test_line.py
 test_flex.py
 test_sdk.py
+
+# Replit 環境檔案
+.local/
+.replit
+replit.nix
+
+# Python 編譯快取
+__pycache__/
+*.pyc
+*.pyo
+
+# 測試產出物
+test_output.docx
+test_download.json
+test_request.json
 node_modules
