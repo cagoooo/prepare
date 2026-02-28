@@ -142,8 +142,7 @@ function parseHtmlToFlexBody(htmlContent) {
                         wrap: true,
                         size: "sm",
                         color: "#333333",
-                        margin: "sm",
-                        lineSpacing: "135%"
+                        margin: "sm"
                     },
                     {
                         type: "separator",
