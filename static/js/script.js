@@ -136,6 +136,30 @@ document.addEventListener('DOMContentLoaded', function () {
 });
 
 function downloadDocx(htmlContent) {
+    const progressContainer = document.getElementById('progress-container');
+    const loadingText = progressContainer.querySelector('.loading-text');
+    const originalText = loadingText.textContent;
+
+    if (progressContainer) {
+        loadingText.textContent = '正在準備您的 Word 檔案，請稍候...';
+        progressContainer.style.display = 'block';
+        progressContainer.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+
+    // 重用進度條邏輯
+    let currentProgress = 0;
+    const interval = setInterval(() => {
+        if (currentProgress < 90) {
+            currentProgress += Math.random() * 10;
+            const fill = document.getElementById('progress-fill');
+            const text = document.getElementById('progress-percent');
+            if (fill && text) {
+                fill.style.width = currentProgress + '%';
+                text.textContent = Math.round(currentProgress) + '%';
+            }
+        }
+    }, 200);
+
     fetch(DOWNLOAD_DOCX_URL, {
         method: 'POST',
         headers: {
@@ -145,16 +169,32 @@ function downloadDocx(htmlContent) {
     })
         .then(response => response.blob())
         .then(blob => {
-            const url = window.URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.style.display = 'none';
-            a.href = url;
-            a.download = 'lesson_plan.docx';
-            document.body.appendChild(a);
-            a.click();
-            window.URL.revokeObjectURL(url);
+            clearInterval(interval);
+            const fill = document.getElementById('progress-fill');
+            const text = document.getElementById('progress-percent');
+            if (fill && text) {
+                fill.style.width = '100%';
+                text.textContent = '100%';
+            }
+
+            setTimeout(() => {
+                const url = window.URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.style.display = 'none';
+                a.href = url;
+                a.download = 'lesson_plan.docx';
+                document.body.appendChild(a);
+                a.click();
+                window.URL.revokeObjectURL(url);
+                progressContainer.style.display = 'none';
+                loadingText.textContent = originalText; // 恢復原文字
+            }, 500);
         })
         .catch(error => {
+            clearInterval(interval);
             console.error('Error downloading file:', error);
+            if (progressContainer) progressContainer.style.display = 'none';
+            loadingText.textContent = originalText;
+            alert('下載失敗，請稍後再試。');
         });
 }
