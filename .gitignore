@@ -18,6 +18,7 @@ functions/node_modules/
 
 # Firebase Functions 後端機密環境變數
 functions/.env
+.secret.local
 
 # 測試用腳本 (不需進版控)
 test_line.py

@@ -1,9 +1,6 @@
-// API 端點動態切換：本地開發 vs 正式環境
-// 正式環境下，會將此檔案內的 VITE_FUNCTIONS_BASE 替換為實際 URL
-const API_BASE =
-    (location.hostname === 'localhost' || location.hostname === '127.0.0.1')
-        ? 'http://127.0.0.1:5001/teacher-c571b/asia-east1'
-        : (import.meta.env.VITE_FUNCTIONS_BASE || 'http://127.0.0.1:5001/teacher-c571b/asia-east1');
+// API 端點切換：使用 Firebase 2nd Gen 獨立功能網址 (解決 CORS 與網址代溝)
+const GENERATE_PLAN_URL = 'https://generateplan-gm5nfzzzwa-de.a.run.app';
+const DOWNLOAD_DOCX_URL = 'https://downloaddocx-gm5nfzzzwa-de.a.run.app';
 
 document.addEventListener('DOMContentLoaded', function () {
     // 解決開發環境緩存問題：註銷所有 Service Worker (僅限 localhost)
@@ -86,7 +83,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
         startSmartProgress();
 
-        fetch(`${API_BASE}/generatePlan`, {
+        fetch(GENERATE_PLAN_URL, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
@@ -137,7 +134,7 @@ document.addEventListener('DOMContentLoaded', function () {
 });
 
 function downloadDocx(htmlContent) {
-    fetch(`${API_BASE}/downloadDocx`, {
+    fetch(DOWNLOAD_DOCX_URL, {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
