@@ -1,5 +1,7 @@
 # 十二年國教教案生成器 (Lesson Plan Generator)
 
+🌐 **線上使用：[教師數位備課教案小幫手](https://cagoooo.github.io/prepare/)**
+
 這是一個專為台灣教師設計的教案生成系統。透過 OpenAI 的強力支援，教師只需輸入基本單元資訊與教學目標，系統即可自動產出符合十二年國教格式的教案。
 
 ## 🚀 核心功能
@@ -56,7 +58,7 @@
 - Repository：`cagoooo/prepare`
 - 可見性：公開
 - 主要技術：JavaScript、Vite、Firebase
-- 線上入口：未在 GitHub repository metadata 設定
+- 線上入口：<https://cagoooo.github.io/prepare/>
 
 ### 可以怎麼應用
 
