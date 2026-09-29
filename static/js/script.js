@@ -113,7 +113,7 @@ document.addEventListener('DOMContentLoaded', function () {
                     const downloadBtn = document.createElement('button');
                     downloadBtn.textContent = '下載 Word 檔案';
                     downloadBtn.id = 'downloadBtn';
-                    downloadBtn.onclick = () => downloadDocx(data.html_content);
+                    downloadBtn.onclick = () => downloadDocx(data.html_content, { subject, grade, unit });
                     resultDiv.appendChild(downloadBtn);
 
                 } else {
@@ -135,7 +135,20 @@ document.addEventListener('DOMContentLoaded', function () {
     });
 });
 
-function downloadDocx(htmlContent) {
+function buildLessonPlanFilename(lessonInfo = {}) {
+    const safePart = value => String(value ?? '')
+        .normalize('NFC')
+        .replace(/[<>:"/\\|?*\u0000-\u001F\u007F]/g, '_')
+        .replace(/\s+/g, '_')
+        .replace(/_+/g, '_')
+        .replace(/^[_. ]+|[_. ]+$/g, '')
+        .slice(0, 60)
+        .replace(/[_. ]+$/g, '');
+    const parts = [lessonInfo.grade, lessonInfo.subject, lessonInfo.unit].map(safePart).filter(Boolean);
+    return parts.length ? `${parts.join('_')}_教案.docx` : '教案.docx';
+}
+
+function downloadDocx(htmlContent, lessonInfo = {}) {
     const progressContainer = document.getElementById('progress-container');
     const loadingText = progressContainer.querySelector('.loading-text');
     const originalText = loadingText.textContent;
@@ -200,7 +213,7 @@ function downloadDocx(htmlContent) {
                 const a = document.createElement('a');
                 a.style.display = 'none';
                 a.href = url;
-                a.download = 'lesson_plan.docx';
+                a.download = buildLessonPlanFilename(lessonInfo);
                 document.body.appendChild(a);
                 a.click();
                 window.URL.revokeObjectURL(url);
