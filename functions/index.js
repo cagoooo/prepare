@@ -5,15 +5,145 @@ const line = require("@line/bot-sdk");
 const HTMLtoDOCX = require("html-to-docx");
 const JSZip = require("jszip");
 const admin = require("firebase-admin");
+const crypto = require("node:crypto");
+const net = require("node:net");
+const { getFirestore, Timestamp } = require("firebase-admin/firestore");
+const cors = require("cors")({ origin: "https://cagoooo.github.io" });
+const OpenCC = require("opencc-js");
+
+// ─── Words 專案常數 ────────────────────────────────────────────────────────
+const WORDS_SYSTEM_PROMPT = `你是年輕人,批判現實,思考深刻,語言風趣。
+風格是"王爾德" "魯迅" "羅永浩"。
+你善於一針見血，喜歡用隱喻來表達，並擅長諷刺幽默。
+你回以 JSON 格式，包含：
+1. "explanation": 解釋詞彙（繁體中文），要求使用隱喻、諷刺，批評現實或人性，長度 150 字內。
+2. "mood": 情感色調，僅限 "positive" (昂揚/褒義), "negative" (抑鬱/貶義), "neutral" (清冷/中性)。
+請務必使用繁體中文和台灣常用的語法與用詞。`;
 
 // ─── 初始化 Firebase Admin (用於 Storage 操作) ───────────────────────────────
 admin.initializeApp();
-const bucket = admin.storage().bucket("teacher-c571b-public");
+const lessonPlanBucket = admin.storage().bucket("teacher-c571b-lesson-plans-private");
+const rateLimitDb = getFirestore(admin.app(), "prepare-rate-limits");
 
 // ─── Firebase Secret Manager ────────────────────────────────────────────────
 const GEMINI_API_KEY = defineSecret("GEMINI_API_KEY");
 const LINE_CHANNEL_ACCESS_TOKEN = defineSecret("LINE_CHANNEL_ACCESS_TOKEN");
 const LINE_USER_ID = defineSecret("LINE_USER_ID");
+const TURNSTILE_SECRET = defineSecret("PREPARE_TURNSTILE_SECRET");
+const RATE_LIMIT_HMAC_KEY = defineSecret("PREPARE_RATE_LIMIT_HMAC_KEY");
+
+const TURNSTILE_VERIFY_URL = "https://challenges.cloudflare.com/turnstile/v0/siteverify";
+const TURNSTILE_EXPECTED_HOSTNAME = "cagoooo.github.io";
+const TURNSTILE_EXPECTED_ACTION = "generate_plan";
+const RATE_LIMIT_WINDOW_MS = 60 * 60 * 1000;
+const MAX_PLAN_INPUT_CHARS = 2000;
+const MAX_PLAN_BODY_BYTES = 24 * 1024;
+const MAX_DOCX_BODY_BYTES = 250 * 1024;
+
+function getClientIp(req) {
+    const candidate = String(req.ip || req.socket?.remoteAddress || "").trim().replace(/^::ffff:/, "");
+    return net.isIP(candidate) ? candidate : null;
+}
+
+async function verifyTurnstileToken(token) {
+    let secret;
+    try {
+        secret = TURNSTILE_SECRET.value();
+    } catch (_) {
+        return { ok: false, status: 503, error: "人機驗證尚未完成設定，請稍後再試。" };
+    }
+    if (!secret) {
+        return { ok: false, status: 503, error: "人機驗證尚未完成設定，請稍後再試。" };
+    }
+    if (typeof token !== "string" || token.length < 1 || token.length > 2048) {
+        return { ok: false, status: 403, error: "請先完成頁面上的人機驗證，再重新送出。" };
+    }
+
+    try {
+        const response = await fetch(TURNSTILE_VERIFY_URL, {
+            method: "POST",
+            headers: { "Content-Type": "application/x-www-form-urlencoded" },
+            body: new URLSearchParams({ secret, response: token }),
+            signal: AbortSignal.timeout(5000),
+        });
+        if (!response.ok) throw new Error(`Siteverify HTTP ${response.status}`);
+        const result = await response.json();
+        if (!result.success) {
+            console.warn("Turnstile rejected request:", result["error-codes"] || []);
+            return { ok: false, status: 403, error: "人機驗證未通過，請重新驗證後再試。" };
+        }
+        if (result.hostname !== TURNSTILE_EXPECTED_HOSTNAME || result.action !== TURNSTILE_EXPECTED_ACTION) {
+            console.warn("Turnstile token hostname or action mismatch.");
+            return { ok: false, status: 403, error: "人機驗證資訊不符，請重新驗證後再試。" };
+        }
+        return { ok: true };
+    } catch (error) {
+        console.error("Turnstile Siteverify unavailable:", error.message);
+        return { ok: false, status: 503, error: "人機驗證服務暫時無法存取，請稍後再試。" };
+    }
+}
+
+async function consumeRateLimit(req, action, maxRequests) {
+    const ip = getClientIp(req);
+    if (!ip) throw new Error("Unable to determine a client IP for rate limiting.");
+
+    let hmacKey;
+    try {
+        hmacKey = RATE_LIMIT_HMAC_KEY.value();
+    } catch (_) {
+        throw new Error("Rate-limit secret is unavailable.");
+    }
+    if (!hmacKey) throw new Error("Rate-limit secret is unavailable.");
+
+    const now = Date.now();
+    const windowStart = Math.floor(now / RATE_LIMIT_WINDOW_MS) * RATE_LIMIT_WINDOW_MS;
+    const ipHash = crypto.createHmac("sha256", hmacKey)
+        .update(`prepare-rate-limit:v1:${action}:${ip}`)
+        .digest("hex");
+    const documentId = `${action}_${ipHash}_${windowStart}`;
+    const record = rateLimitDb.collection("_prepareApiRateLimits").doc(documentId);
+    const expiresAt = Timestamp.fromMillis(windowStart + RATE_LIMIT_WINDOW_MS + 24 * 60 * 60 * 1000);
+
+    return rateLimitDb.runTransaction(async transaction => {
+        const snapshot = await transaction.get(record);
+        const currentCount = snapshot.exists ? Number(snapshot.get("count") || 0) : 0;
+        if (currentCount >= maxRequests) {
+            return {
+                allowed: false,
+                retryAfterSeconds: Math.max(1, Math.ceil((windowStart + RATE_LIMIT_WINDOW_MS - now) / 1000)),
+            };
+        }
+        transaction.set(record, {
+            action,
+            count: currentCount + 1,
+            expiresAt,
+        }, { merge: true });
+        return { allowed: true };
+    });
+}
+
+function requestBodySize(req) {
+    if (Buffer.isBuffer(req.rawBody)) return req.rawBody.length;
+    return Buffer.byteLength(JSON.stringify(req.body || {}));
+}
+
+function safeErrorDetails(error) {
+    const type = typeof error?.name === "string" && /^[A-Za-z][A-Za-z0-9_.-]{0,79}$/.test(error.name)
+        ? error.name
+        : "Error";
+    const statusValue = Number(error?.status || error?.response?.status);
+    const status = Number.isInteger(statusValue) && statusValue >= 100 && statusValue <= 599
+        ? statusValue
+        : undefined;
+    const code = typeof error?.code === "string" && /^[A-Za-z0-9_-]{1,40}$/.test(error.code)
+        ? error.code
+        : undefined;
+    return { type, ...(status ? { status } : {}), ...(code ? { code } : {}) };
+}
+
+function logSafeError(context, error) {
+    console.error(context, safeErrorDetails(error));
+}
 
 // ─── 建立 LINE Flex Message ─────────────────────────────────────────────────
 function createFlexMessage(data, bodyContents, downloadUrl) {
@@ -221,20 +351,62 @@ async function repairDocxPackage(docxBuffer) {
 
 // ─── generatePlan Cloud Function ────────────────────────────────────────────
 exports.generatePlan = onRequest(
-    { secrets: [GEMINI_API_KEY, LINE_CHANNEL_ACCESS_TOKEN, LINE_USER_ID], region: "asia-east1", cors: "https://cagoooo.github.io" },
+    {
+        secrets: [GEMINI_API_KEY, LINE_CHANNEL_ACCESS_TOKEN, LINE_USER_ID, TURNSTILE_SECRET, RATE_LIMIT_HMAC_KEY],
+        region: "asia-east1",
+        cors: "https://cagoooo.github.io",
+        serviceAccount: "prepare-plan-runtime@teacher-c571b.iam.gserviceaccount.com",
+        maxInstances: 5,
+        concurrency: 1,
+    },
     async (req, res) => {
-        // 註：onRequest 已設定 cors: true，Firebase 會自動處理 CORS 預檢與標頭。
-        if (req.method !== "POST") {
-            return res.status(405).json({ error: "Method Not Allowed" });
-        }
+        return cors(req, res, async () => {
+            try {
+                if (req.method !== "POST") {
+                    return res.status(405).json({ error: "Method Not Allowed" });
+                }
+                if (requestBodySize(req) > MAX_PLAN_BODY_BYTES) {
+                    return res.status(413).json({ success: false, error: "輸入內容過長，請縮短後再試。" });
+                }
 
-        const { subject, grade, unit, duration, objectives, materials, methods, details } = req.body;
-        if (!subject || !grade || !unit) {
-            return res.status(400).json({ error: "缺少必填欄位：subject, grade, unit" });
-        }
+                if (!req.body || typeof req.body !== "object" || Array.isArray(req.body)) {
+                    return res.status(400).json({ success: false, error: "請提供有效的教案資料。" });
+                }
+                const { subject, grade, unit, duration, objectives, materials, methods, details, turnstileToken } = req.body;
+                const inputFields = { subject, grade, unit, duration, objectives, materials, methods, details };
+                for (const [field, value] of Object.entries(inputFields)) {
+                    if (value !== undefined && value !== null && typeof value !== "string") {
+                        return res.status(400).json({ success: false, error: `欄位 ${field} 格式不正確。` });
+                    }
+                }
+                if (![subject, grade, unit].every(value => typeof value === "string" && value.trim())) {
+                    return res.status(400).json({ error: "缺少必填欄位：subject, grade, unit" });
+                }
+                const totalInputChars = Object.values(inputFields)
+                    .reduce((total, value) => total + (typeof value === "string" ? value.length : 0), 0);
+                if (totalInputChars > MAX_PLAN_INPUT_CHARS) {
+                    return res.status(413).json({ success: false, error: `輸入文字總長度不可超過 ${MAX_PLAN_INPUT_CHARS} 字。` });
+                }
 
-        // ── Prompt ──
-        const prompt = `你是一位台灣的資深教師，請依照十二年國教課程綱要，為以下課程單元設計一份詳細的教學活動設計表（教案）。
+                const verification = await verifyTurnstileToken(turnstileToken);
+                if (!verification.ok) {
+                    return res.status(verification.status).json({ success: false, error: verification.error });
+                }
+
+                let generationLimit;
+                try {
+                    generationLimit = await consumeRateLimit(req, "plan_generation", 5);
+                } catch (rateLimitError) {
+                    logSafeError("Plan generation rate limiter unavailable", rateLimitError);
+                    return res.status(503).json({ success: false, error: "使用量保護暫時無法存取，請稍後再試。" });
+                }
+                if (!generationLimit.allowed) {
+                    return res.status(429)
+                        .set("Retry-After", String(generationLimit.retryAfterSeconds))
+                        .json({ success: false, error: "每個網路每小時最多可產生 5 份教案，請稍後再試。" });
+                }
+
+                const prompt = `你是一位台灣的資深教師，請依照十二年國教課程綱要，為以下課程單元設計一份詳細的教學活動設計表（教案）。
 請完整填寫所有欄位，並以 HTML 表格格式輸出，表格包含以下欄位：
 1. 學習領域 / 科目
 2. 實施年級
@@ -261,162 +433,179 @@ exports.generatePlan = onRequest(
 請以完整的 HTML 表格格式（使用 <table>, <tr>, <th>, <td> 標籤）輸出，不要包含任何 Markdown 語法。
 每個欄位的說明都要詳細完整，並根據台灣教育環境設計符合實際教學的內容。`;
 
-        try {
-            const genAI = new GoogleGenerativeAI(GEMINI_API_KEY.value());
-            const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash-lite" });
+                const genAI = new GoogleGenerativeAI(GEMINI_API_KEY.value());
+                const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash-lite" });
 
-            let response;
-            let retryCount = 0;
-            const maxRetries = 2;
+                let response;
+                let retryCount = 0;
+                const maxRetries = 2;
 
-            while (retryCount <= maxRetries) {
-                try {
-                    const result = await model.generateContent(prompt);
-                    response = result.response;
-                    break; // 成功則跳出循環
-                } catch (aiErr) {
-                    if (aiErr.message.includes("503") || aiErr.status === 503) {
-                        retryCount++;
-                        if (retryCount <= maxRetries) {
-                            console.warn(`Gemini API 繁忙 (503)，等待 2 秒後進行第 ${retryCount} 次重試...`);
-                            await new Promise(resolve => setTimeout(resolve, 2000));
-                            continue;
+                while (retryCount <= maxRetries) {
+                    try {
+                        const result = await model.generateContent(prompt);
+                        response = result.response;
+                        break;
+                    } catch (aiErr) {
+                        if (aiErr.message.includes("503") || aiErr.status === 503) {
+                            retryCount++;
+                            if (retryCount <= maxRetries) {
+                                console.warn(`Gemini API 繁忙 (503)，等待 2 秒後進行第 ${retryCount} 次重試...`);
+                                await new Promise(resolve => setTimeout(resolve, 2000));
+                                continue;
+                            }
                         }
+                        throw aiErr;
                     }
-                    throw aiErr; // 其他錯誤或重試耗盡則拋出
                 }
-            }
 
-            let content = response.text().replace(/```html/g, "").replace(/```/g, "").trim();
-            if (content.includes("</table>")) {
-                content = content.split("</table>")[0] + "</table>";
-            }
+                let content = response.text().replace(/```html/g, "").replace(/```/g, "").trim();
+                if (content.includes("</table>")) {
+                    content = content.split("</table>")[0] + "</table>";
+                }
 
-            // ── 同步產出 DOCX 並上傳至 Storage ──
-            let downloadUrl = null;
-            try {
-                const styledHtml = `<!DOCTYPE html><html><head><style>body { font-family: 'Microsoft JhengHei', sans-serif; font-size: 11pt; } table { border-collapse: collapse; width: 100%; } th, td { border: 1px solid #000; padding: 8px; vertical-align: top; } th { background-color: #D9EAD3; font-weight: bold; }</style></head><body>${content}</body></html>`;
-                const generatedDocx = await HTMLtoDOCX(styledHtml, null, {
-                    table: { row: { cantSplit: true } },
-                    margins: { top: 720, bottom: 720, left: 1080, right: 1080, header: 720, footer: 720, gutter: 0 },
-                });
-
-                const downloadToken = `token_${Date.now()}`;
-                const docxBuffer = await repairDocxPackage(generatedDocx);
-                    const fileName = `lesson_plans/${Date.now()}_${unit.replace(/\s+/g, "_")}.docx`;
-                const file = bucket.file(fileName);
-                await file.save(Buffer.from(docxBuffer), {
-                    metadata: {
-                        contentType: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-                        // Removed firebaseStorageDownloadTokens as per instruction to use public URL
-                    }
-                });
-
-                // 手動建構具備 Token 的下載連結 (無須 IAM 簽署權限，更穩定)
-                // 使用穩定的公開 GCS 下載連結
-                downloadUrl = `https://storage.googleapis.com/teacher-c571b-public/${encodeURIComponent(fileName)}`;
-                console.log("Generated Public Download URL:", downloadUrl);
-            } catch (docxErr) {
-                console.error("DOCX skip/fail:", docxErr.message);
-                console.error("Stack:", docxErr.stack);
-            }
-
-            // ── LINE Flex 通知 ──
-            try {
-                const lineToken = LINE_CHANNEL_ACCESS_TOKEN.value();
-                const lineUserId = LINE_USER_ID.value();
-                if (lineToken && lineUserId) {
-                    const client = new line.messagingApi.MessagingApiClient({ channelAccessToken: lineToken });
-                    const flexBody = parseHtmlToFlexBody(content);
-                    const flexMsg = createFlexMessage({ subject, grade, unit }, flexBody, downloadUrl);
-
-                    await client.pushMessage({
-                        to: lineUserId,
-                        messages: [{ type: "flex", altText: "教案生成成功", contents: flexMsg }],
+                let downloadUrl = null;
+                try {
+                    const styledHtml = `<!DOCTYPE html><html><head><style>body { font-family: 'Microsoft JhengHei', sans-serif; font-size: 11pt; } table { border-collapse: collapse; width: 100%; } th, td { border: 1px solid #000; padding: 8px; vertical-align: top; } th { background-color: #D9EAD3; font-weight: bold; }</style></head><body>${content}</body></html>`;
+                    const generatedDocx = await HTMLtoDOCX(styledHtml, null, {
+                        table: { row: { cantSplit: true } },
+                        margins: { top: 720, bottom: 720, left: 1080, right: 1080, header: 720, footer: 720, gutter: 0 },
                     });
-                    console.log("LINE Flex notification sent.");
-                }
-            } catch (lineErr) {
-                console.error("LINE notification failed!");
-                if (lineErr.response && lineErr.response.headers) {
-                    // 檢查 x-line-request-id 方便查案
-                    console.error("Request ID:", lineErr.response.headers["x-line-request-id"]);
-                }
-                if (lineErr.body && lineErr.body.details) {
-                    console.error("Error details (v9):", JSON.stringify(lineErr.body.details, null, 2));
-                } else if (lineErr.response && lineErr.response.data) {
-                    console.error("Error data:", JSON.stringify(lineErr.response.data, null, 2));
-                } else {
-                    console.error("Error message:", lineErr.message);
-                    console.error("Full error:", lineErr);
-                }
-            }
 
-            return res.json({ success: true, plan: content, html_content: content });
-        } catch (err) {
-            console.error("generatePlan error:", err);
-            return res.status(500).json({ success: false, error: err.message, stack: err.stack });
-        }
+                    const docxBuffer = await repairDocxPackage(generatedDocx);
+                    const fileName = `lesson_plans/${Date.now()}_${crypto.randomUUID()}.docx`;
+                    const file = lessonPlanBucket.file(fileName);
+                    await file.save(Buffer.from(docxBuffer), {
+                        metadata: {
+                            contentType: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                            cacheControl: "private, no-store",
+                        }
+                    });
+
+                    [downloadUrl] = await file.getSignedUrl({
+                        version: "v4",
+                        action: "read",
+                        expires: Date.now() + 7 * 24 * 60 * 60 * 1000,
+                    });
+                    console.log("Generated private lesson plan document with a seven-day download link.");
+                } catch (docxErr) {
+                    logSafeError("DOCX generation failed", docxErr);
+                }
+
+                try {
+                    const lineToken = LINE_CHANNEL_ACCESS_TOKEN.value();
+                    const lineUserId = LINE_USER_ID.value();
+                    if (lineToken && lineUserId) {
+                        const client = new line.messagingApi.MessagingApiClient({ channelAccessToken: lineToken });
+                        const flexBody = parseHtmlToFlexBody(content);
+                        const flexMsg = createFlexMessage({ subject, grade, unit }, flexBody, downloadUrl);
+
+                        await client.pushMessage({
+                            to: lineUserId,
+                            messages: [{ type: "flex", altText: "教案生成成功", contents: flexMsg }],
+                        });
+                        console.log("LINE Flex notification sent.");
+                    }
+                } catch (lineErr) {
+                    logSafeError("LINE notification failed", lineErr);
+                }
+
+                return res.json({ success: true, plan: content, html_content: content });
+            } catch (err) {
+                logSafeError("Plan generation failed", err);
+                return res.status(500).json({ success: false, error: "教案產生失敗，請稍後再試。" });
+            }
+        });
     }
 );
 
 // ─── downloadDocx Cloud Function ────────────────────────────────────────────
-exports.downloadDocx = onRequest({ region: "asia-east1", cors: "https://cagoooo.github.io" }, async (req, res) => {
-    try {
-        if (req.method !== "POST") {
-            return res.status(405).json({ error: "Method Not Allowed" });
-        }
-        const { html_content } = req.body;
-        if (!html_content) {
-            return res.status(400).json({ error: "缺少 html_content 欄位" });
-        }
-
-        const { JSDOM } = require("jsdom");
-        const dom = new JSDOM(html_content);
-        const document = dom.window.document;
-        const normalizeText = value => String(value || "")
-            .replace(/[\t\r\n\f\v]+/g, " ")
-            .replace(/[\u00a0\u3000]/g, " ")
-            .replace(/ {2,}/g, " ")
-            .trim();
-
-        const cells = document.querySelectorAll("td, th");
-        cells.forEach(cell => {
-            const nestedTables = cell.querySelectorAll("table");
-            nestedTables.forEach(nested => {
-                const rows = nested.querySelectorAll("tr");
-                const div = document.createElement("div");
-                rows.forEach(row => {
-                    const rowText = normalizeText(Array.from(row.cells).map(c => c.textContent).join(" | "));
-                    const p = document.createElement("p");
-                    p.textContent = rowText;
-                    div.appendChild(p);
-                });
-                nested.parentNode.replaceChild(div, nested);
-            });
-
-            const allElements = [cell, ...cell.querySelectorAll("*")];
-            allElements.forEach(el => {
-                el.removeAttribute("class");
-                el.removeAttribute("style");
-                el.removeAttribute("align");
-                el.removeAttribute("valign");
-            });
-
-            const textWalker = document.createTreeWalker(cell, dom.window.NodeFilter.SHOW_TEXT);
-            let textNode;
-            while ((textNode = textWalker.nextNode())) {
-                const originalText = textNode.nodeValue;
-                const normalizedText = originalText
-                    .replace(/[\t\r\n\f\v]+/g, " ")
-                    .replace(/[\u00a0\u3000]/g, " ")
-                    .replace(/ {2,}/g, " ");
-                textNode.nodeValue = normalizedText.trim() ? normalizedText : " ";
+exports.downloadDocx = onRequest({
+    region: "asia-east1",
+    cors: "https://cagoooo.github.io",
+    serviceAccount: "prepare-download-runtime@teacher-c571b.iam.gserviceaccount.com",
+    maxInstances: 5,
+    concurrency: 1,
+    secrets: [RATE_LIMIT_HMAC_KEY, TURNSTILE_SECRET],
+}, async (req, res) => {
+    return cors(req, res, async () => {
+        try {
+            if (req.method !== "POST") {
+                return res.status(405).json({ error: "Method Not Allowed" });
             }
-        });
+            if (requestBodySize(req) > MAX_DOCX_BODY_BYTES) {
+                return res.status(413).json({ error: "教案內容過大，請重新產生後再下載。" });
+            }
+            if (!req.body || typeof req.body !== "object" || Array.isArray(req.body)) {
+                return res.status(400).json({ error: "請提供有效的教案內容。" });
+            }
+            const { html_content, turnstileToken } = req.body;
+            if (typeof html_content !== "string" || !html_content.trim()) {
+                return res.status(400).json({ error: "缺少 html_content 欄位" });
+            }
+            const verification = await verifyTurnstileToken(turnstileToken);
+            if (!verification.ok) {
+                return res.status(verification.status).json({ error: verification.error });
+            }
+            let downloadLimit;
+            try {
+                downloadLimit = await consumeRateLimit(req, "docx_download", 10);
+            } catch (rateLimitError) {
+                logSafeError("DOCX rate limiter unavailable", rateLimitError);
+                return res.status(503).json({ error: "使用量保護暫時無法存取，請稍後再試。" });
+            }
+            if (!downloadLimit.allowed) {
+                return res.status(429)
+                    .set("Retry-After", String(downloadLimit.retryAfterSeconds))
+                    .json({ error: "每個網路每小時最多可下載 Word 10 次，請稍後再試。" });
+            }
 
-        const finalHtmlContent = document.body.innerHTML;
-        const styledHtml = `<!DOCTYPE html>
+            const { JSDOM } = require("jsdom");
+            const dom = new JSDOM(html_content);
+            const document = dom.window.document;
+
+            const normalizeText = value => String(value || "")
+                .replace(/[\t\r\n\f\v]+/g, " ")
+                .replace(/[\u00a0\u3000]/g, " ")
+                .replace(/ {2,}/g, " ")
+                .trim();
+
+            const cells = document.querySelectorAll("td, th");
+            cells.forEach(cell => {
+                const nestedTables = cell.querySelectorAll("table");
+                nestedTables.forEach(nested => {
+                    const rows = nested.querySelectorAll("tr");
+                    const div = document.createElement("div");
+                    rows.forEach(row => {
+                        const rowText = normalizeText(Array.from(row.cells).map(c => c.textContent).join(" | "));
+                        const p = document.createElement("p");
+                        p.textContent = rowText;
+                        div.appendChild(p);
+                    });
+                    nested.parentNode.replaceChild(div, nested);
+                });
+
+                const allElements = [cell, ...cell.querySelectorAll("*")];
+                allElements.forEach(el => {
+                    el.removeAttribute("class");
+                    el.removeAttribute("style");
+                    el.removeAttribute("align");
+                    el.removeAttribute("valign");
+                });
+
+                const textWalker = document.createTreeWalker(cell, dom.window.NodeFilter.SHOW_TEXT);
+                let textNode;
+                while ((textNode = textWalker.nextNode())) {
+                    const originalText = textNode.nodeValue;
+                    const normalizedText = originalText
+                        .replace(/[\t\r\n\f\v]+/g, " ")
+                        .replace(/[\u00a0\u3000]/g, " ")
+                        .replace(/ {2,}/g, " ");
+                    textNode.nodeValue = normalizedText.trim() ? normalizedText : " ";
+                }
+            });
+
+            const finalHtmlContent = document.body.innerHTML;
+            const styledHtml = `<!DOCTYPE html>
 <html>
 <head>
 <meta charset="utf-8">
@@ -434,22 +623,95 @@ exports.downloadDocx = onRequest({ region: "asia-east1", cors: "https://cagoooo.
 <body>${finalHtmlContent}</body>
 </html>`;
 
-        const generatedDocx = await HTMLtoDOCX(styledHtml, null, {
-            table: { row: { cantSplit: true } },
-            pageSize: { width: 11906, height: 16838 },
-            margins: { top: 900, bottom: 900, left: 900, right: 900, header: 450, footer: 450, gutter: 0 },
-            font: "Microsoft JhengHei",
-            fontSize: 22,
-            complexScriptFontSize: 22,
-            lang: "zh-TW",
-        });
+            const generatedDocx = await HTMLtoDOCX(styledHtml, null, {
+                table: { row: { cantSplit: true } },
+                pageSize: { width: 11906, height: 16838 },
+                margins: { top: 900, bottom: 900, left: 900, right: 900, header: 450, footer: 450, gutter: 0 },
+                font: "Microsoft JhengHei",
+                fontSize: 22,
+                complexScriptFontSize: 22,
+                lang: "zh-TW",
+            });
 
-        const docxBuffer = await repairDocxPackage(generatedDocx);
+            const docxBuffer = await repairDocxPackage(generatedDocx);
             res.setHeader("Content-Disposition", "attachment; filename=lesson_plan.docx");
-        res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.wordprocessingml.document");
-        return res.send(Buffer.from(docxBuffer));
-    } catch (err) {
-        console.error("downloadDocx error:", err);
-        return res.status(500).json({ error: err.message });
-    }
+            res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.wordprocessingml.document");
+            res.setHeader("Cache-Control", "private, no-store");
+            return res.send(Buffer.from(docxBuffer));
+        } catch (err) {
+            logSafeError("Word export failed", err);
+            return res.status(500).json({ error: "Word 檔案產生失敗，請稍後再試。" });
+        }
+    });
 });
+
+// ─── Words 專案: generateExplanation Cloud Function ──────────────────────────
+const wordsRateLimit = new Map();
+const WORDS_LIMIT_WINDOW = 60 * 1000;
+const WORDS_MAX_REQUESTS = 5;
+
+exports.generateExplanation = onRequest({
+    region: "asia-east1",
+    cors: true,
+    secrets: [GEMINI_API_KEY]
+}, async (req, res) => {
+    return cors(req, res, async () => {
+        try {
+            if (req.method !== "POST") {
+                return res.status(405).json({ error: "Method Not Allowed" });
+            }
+
+            // Basic Rate Limiting
+            const ip = req.ip || req.headers['x-forwarded-for'] || 'unknown';
+            const now = Date.now();
+            const userRequests = wordsRateLimit.get(ip) || [];
+            const recentRequests = userRequests.filter(time => now - time < WORDS_LIMIT_WINDOW);
+
+            if (recentRequests.length >= WORDS_MAX_REQUESTS) {
+                return res.status(429).json({ error: "請求過於頻繁，請稍後再試（誠心方能得真相）。" });
+            }
+            recentRequests.push(now);
+            wordsRateLimit.set(ip, recentRequests);
+
+            const inputWord = req.body.input || "";
+            if (!inputWord) {
+                return res.status(400).json({ error: "未提供輸入" });
+            }
+
+            const apiKey = GEMINI_API_KEY.value();
+            const genAI = new GoogleGenerativeAI(apiKey);
+            const model = genAI.getGenerativeModel({
+                model: "gemini-2.0-flash",
+                systemInstruction: WORDS_SYSTEM_PROMPT,
+                generationConfig: { responseMimeType: "application/json" }
+            });
+
+            console.log(`Requesting explanation for: ${inputWord}`);
+            const result = await model.generateContent(`請解釋這個詞：「${inputWord}」`);
+            const response = await result.response;
+            const responseText = response.text();
+            const data = JSON.parse(responseText);
+
+            // Convert to Traditional Chinese (Taiwan mapping)
+            const converter = OpenCC.Converter({ from: 'cn', to: 'twp' });
+            let explanation = converter(data.explanation);
+
+            // Format to bullet points
+            const bulletPoints = convertToBulletPoints(explanation);
+
+            return res.status(200).json({
+                explanation: bulletPoints,
+                mood: data.mood
+            });
+
+        } catch (err) {
+            console.error("generateExplanation error:", err);
+            return res.status(500).json({ error: "AI 生成失敗，請稍後再試", detail: err.message });
+        }
+    });
+});
+
+function convertToBulletPoints(text) {
+    const sentences = text.split(/[。！？\n]/).map(s => s.trim()).filter(s => s.length > 0);
+    return sentences.map((s, i) => `${i + 1}. ${s}${s.match(/[。！？]$/) ? '' : '。'}`).join('\n');
+}

@@ -1,0 +1,12 @@
+# Keep local credentials and emulator secrets out of Cloud Build uploads.
+.secret.local
+.env
+.env.*
+*.local
+firebase-debug.log
+firebase-debug.*.log
+node_modules/
+.git/
+test_*.js
+*.test.js
+coverage/

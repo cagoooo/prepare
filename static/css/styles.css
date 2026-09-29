@@ -683,6 +683,28 @@ button[type="submit"]:hover {
     margin-bottom: 20px;
 }
 
+.turnstile-group {
+    margin-top: 8px;
+}
+
+#turnstile-widget {
+    min-height: 65px;
+    display: flex;
+    justify-content: center;
+}
+
+#turnstile-status,
+.usage-notice {
+    margin: 4px 0 0;
+    color: #555;
+    font-size: 14px;
+    text-align: center;
+}
+
+.usage-notice {
+    margin-top: 8px;
+}
+
 .animated-label {
     display: block;
     margin-bottom: 5px;

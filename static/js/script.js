@@ -1,6 +1,43 @@
 // API 端點切換：使用 Firebase 2nd Gen 獨立功能網址 (解決 CORS 與網址代溝)
 const GENERATE_PLAN_URL = 'https://asia-east1-teacher-c571b.cloudfunctions.net/generatePlan';
 const DOWNLOAD_DOCX_URL = 'https://asia-east1-teacher-c571b.cloudfunctions.net/downloadDocx';
+const TURNSTILE_SITE_KEY = '0x4AAAAAAFIt_ajnZaQP0S-J';
+
+let turnstileToken = null;
+let turnstileWidgetId = null;
+
+function loadTurnstile() {
+    if (window.turnstile?.render) return Promise.resolve(window.turnstile);
+
+    return new Promise((resolve, reject) => {
+        const script = document.createElement('script');
+        script.src = 'https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit';
+        script.async = true;
+        script.defer = true;
+        script.onload = () => {
+            if (!window.turnstile?.ready) {
+                reject(new Error('Cloudflare 安全驗證載入失敗。'));
+                return;
+            }
+            window.turnstile.ready(() => resolve(window.turnstile));
+        };
+        script.onerror = () => reject(new Error('無法載入 Cloudflare 安全驗證，請檢查網路後重新整理。'));
+        document.head.appendChild(script);
+    });
+}
+
+function resetTurnstile() {
+    turnstileToken = null;
+    if (window.turnstile && turnstileWidgetId !== null) {
+        try {
+            window.turnstile.reset(turnstileWidgetId);
+        } catch (error) {
+            console.warn('Turnstile reset failed:', error);
+        }
+    }
+    const status = document.getElementById('turnstile-status');
+    if (status) status.textContent = '請完成安全驗證後再產生教案。';
+}
 
 document.addEventListener('DOMContentLoaded', function () {
     // 解決開發環境緩存問題：註銷所有 Service Worker (僅限 localhost)
@@ -17,6 +54,35 @@ document.addEventListener('DOMContentLoaded', function () {
 
     const form = document.getElementById('lesson-plan-form');
     const resultDiv = document.getElementById('result');
+    const turnstileContainer = document.getElementById('turnstile-widget');
+    const turnstileStatus = document.getElementById('turnstile-status');
+
+    loadTurnstile()
+        .then(turnstile => {
+            turnstileWidgetId = turnstile.render(turnstileContainer, {
+                sitekey: TURNSTILE_SITE_KEY,
+                action: 'generate_plan',
+                theme: 'light',
+                size: 'flexible',
+                callback: token => {
+                    turnstileToken = token;
+                    turnstileStatus.textContent = '安全驗證完成，可以產生教案。';
+                },
+                'expired-callback': () => {
+                    turnstileToken = null;
+                    turnstileStatus.textContent = '驗證已逾時，請重新完成安全驗證。';
+                },
+                'error-callback': () => {
+                    turnstileToken = null;
+                    turnstileStatus.textContent = '安全驗證暫時無法使用，請重新整理頁面後再試。';
+                },
+            });
+            turnstileStatus.textContent = '請完成安全驗證後再產生教案。';
+        })
+        .catch(error => {
+            console.error('Turnstile initialization failed:', error);
+            turnstileStatus.textContent = error.message;
+        });
 
     let progressInterval;
 
@@ -59,6 +125,12 @@ document.addEventListener('DOMContentLoaded', function () {
     form.addEventListener('submit', function (e) {
         e.preventDefault();
 
+        if (!turnstileToken) {
+            turnstileStatus.textContent = '請先完成安全驗證，再產生教案。';
+            turnstileContainer.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            return;
+        }
+
         const submitButton = form.querySelector('button[type="submit"]');
         submitButton.disabled = true;
         submitButton.style.opacity = '0.5';
@@ -88,7 +160,7 @@ document.addEventListener('DOMContentLoaded', function () {
             headers: {
                 'Content-Type': 'application/json',
             },
-            body: JSON.stringify({ subject, grade, unit, details }),
+            body: JSON.stringify({ subject, grade, unit, details, turnstileToken }),
         })
             .then(response => response.json())
             .then(data => {
@@ -131,7 +203,8 @@ document.addEventListener('DOMContentLoaded', function () {
                 submitButton.disabled = false;
                 submitButton.style.opacity = '1';
                 submitButton.style.cursor = 'pointer';
-            });
+            })
+            .finally(resetTurnstile);
     });
 });
 
@@ -149,6 +222,15 @@ function buildLessonPlanFilename(lessonInfo = {}) {
 }
 
 function downloadDocx(htmlContent, lessonInfo = {}) {
+    if (!turnstileToken) {
+        const status = document.getElementById('turnstile-status');
+        const widget = document.getElementById('turnstile-widget');
+        if (status) status.textContent = '請先完成安全驗證，再下載 Word 檔案。';
+        if (widget) widget.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        return;
+    }
+
+    const token = turnstileToken;
     const progressContainer = document.getElementById('progress-container');
     const loadingText = progressContainer.querySelector('.loading-text');
     const originalText = loadingText.textContent;
@@ -178,7 +260,7 @@ function downloadDocx(htmlContent, lessonInfo = {}) {
         headers: {
             'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ html_content: htmlContent }),
+        body: JSON.stringify({ html_content: htmlContent, turnstileToken: token }),
     })
         .then(async response => {
             if (!response.ok) {
@@ -227,5 +309,6 @@ function downloadDocx(htmlContent, lessonInfo = {}) {
             if (progressContainer) progressContainer.style.display = 'none';
             loadingText.textContent = originalText;
             alert(error.message || '下載失敗，請稍後再試。');
-        });
+        })
+        .finally(resetTurnstile);
 }
