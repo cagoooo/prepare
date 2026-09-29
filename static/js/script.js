@@ -12,14 +12,13 @@ function loadTurnstile() {
     return new Promise((resolve, reject) => {
         const script = document.createElement('script');
         script.src = 'https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit';
-        script.async = true;
-        script.defer = true;
+        script.async = false;
         script.onload = () => {
-            if (!window.turnstile?.ready) {
+            if (!window.turnstile?.render) {
                 reject(new Error('Cloudflare 安全驗證載入失敗。'));
                 return;
             }
-            window.turnstile.ready(() => resolve(window.turnstile));
+            resolve(window.turnstile);
         };
         script.onerror = () => reject(new Error('無法載入 Cloudflare 安全驗證，請檢查網路後重新整理。'));
         document.head.appendChild(script);
