@@ -299,43 +299,31 @@ exports.generatePlan = onRequest(
 
 // ─── downloadDocx Cloud Function ────────────────────────────────────────────
 exports.downloadDocx = onRequest({ region: "asia-east1", cors: "https://cagoooo.github.io" }, async (req, res) => {
-    if (req.method !== "POST") {
-        return res.status(405).json({ error: "Method Not Allowed" });
-    }
-    const { html_content } = req.body;
-    if (!html_content) {
-        return res.status(400).json({ error: "缺少 html_content 欄位" });
-    }
     try {
+        if (req.method !== "POST") {
+            return res.status(405).json({ error: "Method Not Allowed" });
+        }
+        const { html_content } = req.body;
+        if (!html_content) {
+            return res.status(400).json({ error: "缺少 html_content 欄位" });
+        }
+
         const dom = new JSDOM(html_content);
         const document = dom.window.document;
+        const normalizeText = value => String(value || "")
+            .replace(/[\t\r\n\f\v]+/g, " ")
+            .replace(/[\u00a0\u3000]/g, " ")
+            .replace(/ {2,}/g, " ")
+            .trim();
 
-        // 激底扁平化：將表格內的複雜結構全部轉為段落
         const cells = document.querySelectorAll("td, th");
         cells.forEach(cell => {
-            // 先處理清單，將 li 轉為帶點的文字
-            const lists = cell.querySelectorAll("ul, ol");
-            lists.forEach(list => {
-                const items = list.querySelectorAll("li");
-                items.forEach(li => {
-                    const p = document.createElement("p");
-                    p.textContent = "• " + li.textContent;
-                    li.parentNode.replaceChild(p, li);
-                });
-                // 移除 ul/ol 標籤，保留內容
-                while (list.firstChild) {
-                    list.parentNode.insertBefore(list.firstChild, list);
-                }
-                list.parentNode.removeChild(list);
-            });
-
-            // 再處理子表格，將其內容全部拉出來並轉成文字
             const nestedTables = cell.querySelectorAll("table");
             nestedTables.forEach(nested => {
                 const rows = nested.querySelectorAll("tr");
                 const div = document.createElement("div");
                 rows.forEach(row => {
-                    const rowText = Array.from(row.cells).map(c => c.textContent.trim()).join(" | ");
+                    const rowText = normalizeText(Array.from(row.cells).map(c => c.textContent).join(" | "));
                     const p = document.createElement("p");
                     p.textContent = rowText;
                     div.appendChild(p);
@@ -343,36 +331,55 @@ exports.downloadDocx = onRequest({ region: "asia-east1", cors: "https://cagoooo.
                 nested.parentNode.replaceChild(div, nested);
             });
 
-            // 移除所有 class 與 style，防止干擾渲染
-            const allElements = cell.querySelectorAll("*");
+            const allElements = [cell, ...cell.querySelectorAll("*")];
             allElements.forEach(el => {
                 el.removeAttribute("class");
                 el.removeAttribute("style");
+                el.removeAttribute("align");
+                el.removeAttribute("valign");
             });
+
+            const textWalker = document.createTreeWalker(cell, dom.window.NodeFilter.SHOW_TEXT);
+            let textNode;
+            while ((textNode = textWalker.nextNode())) {
+                const originalText = textNode.nodeValue;
+                const normalizedText = originalText
+                    .replace(/[\t\r\n\f\v]+/g, " ")
+                    .replace(/[\u00a0\u3000]/g, " ")
+                    .replace(/ {2,}/g, " ");
+                textNode.nodeValue = normalizedText.trim() ? normalizedText : " ";
+            }
         });
 
         const finalHtmlContent = document.body.innerHTML;
-
-        const styledHtml = `
-<!DOCTYPE html>
+        const styledHtml = `<!DOCTYPE html>
 <html>
 <head>
 <meta charset="utf-8">
 <style>
-  @page { margin: 2cm; }
-  body { font-family: 'Microsoft JhengHei', '微軟正黑體', sans-serif; font-size: 11pt; color: #000; }
-  table { border-collapse: collapse; width: 100%; border: 1px solid #000; margin-bottom: 10pt; }
-  th, td { border: 1px solid #000; padding: 10px; vertical-align: top; word-break: break-all; }
+  @page { size: A4 portrait; margin: 16mm; }
+  body { font-family: 'Microsoft JhengHei', '微軟正黑體', sans-serif; font-size: 11pt; color: #000; text-align: left; }
+  table { border-collapse: collapse; width: 100%; border: 1px solid #000; margin-bottom: 8pt; }
+  th, td { border: 1px solid #000; padding: 7px; vertical-align: top; text-align: left; text-indent: 0; word-break: normal; }
   th { background-color: #f2f2f2; font-weight: bold; }
-  p { margin: 0 0 5pt 0; line-height: 1.5; }
+  p { margin: 0 0 4pt 0; line-height: 1.35; text-align: left; text-indent: 0; }
+  ul, ol { margin: 0 0 4pt 0; padding-left: 18pt; text-align: left; }
+  li { margin: 0 0 3pt 0; line-height: 1.35; text-align: left; }
 </style>
 </head>
 <body>${finalHtmlContent}</body>
 </html>`;
+
         const docxBuffer = await HTMLtoDOCX(styledHtml, null, {
             table: { row: { cantSplit: true } },
-            margin: { top: 720, bottom: 720, left: 1080, right: 1080 },
+            pageSize: { width: 11906, height: 16838 },
+            margins: { top: 900, bottom: 900, left: 900, right: 900 },
+            font: "Microsoft JhengHei",
+            fontSize: 22,
+            complexScriptFontSize: 22,
+            lang: "zh-TW",
         });
+
         res.setHeader("Content-Disposition", "attachment; filename=lesson_plan.docx");
         res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.wordprocessingml.document");
         return res.send(Buffer.from(docxBuffer));
