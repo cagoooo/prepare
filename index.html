@@ -6,8 +6,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>桃園市石門國小數位備課小幫手</title>
     <link rel="icon" type="image/x-icon" href="/prepare/assets/write-C_2xZw2w.ico">
-  <script type="module" crossorigin src="/prepare/assets/index-tHNJTVmh.js"></script>
-  <link rel="stylesheet" crossorigin href="/prepare/assets/index-CWvHzu2n.css">
+  <script type="module" crossorigin src="/prepare/assets/index-BvSxt0eS.js"></script>
+  <link rel="stylesheet" crossorigin href="/prepare/assets/index-Fp-H2hAu.css">
 </head>
 
 <body>
@@ -19,19 +19,25 @@
         <form id="lesson-plan-form">
             <div class="form-group">
                 <label for="subject" class="animated-label">教學領域(必填)：</label>
-                <input type="text" id="subject" name="subject" class="animated-input" required>
+                <input type="text" id="subject" name="subject" class="animated-input" maxlength="100" required>
             </div>
             <div class="form-group">
                 <label for="grade" class="animated-label">實施年級(必填)：</label>
-                <input type="text" id="grade" name="grade" class="animated-input" required>
+                <input type="text" id="grade" name="grade" class="animated-input" maxlength="40" required>
             </div>
             <div class="form-group">
                 <label for="unit" class="animated-label">單元名稱(必填)：</label>
-                <input type="text" id="unit" name="unit" class="animated-input" required>
+                <input type="text" id="unit" name="unit" class="animated-input" maxlength="120" required>
             </div>
             <div class="form-group">
                 <label for="details" class="animated-label">額外細節(選填～填了可大幅增強產出結果！)：</label>
-                <textarea id="details" name="details" rows="4" class="animated-input"></textarea>
+                <textarea id="details" name="details" rows="4" maxlength="1600" class="animated-input"></textarea>
+            </div>
+            <div class="form-group turnstile-group">
+                <label class="animated-label">安全驗證：</label>
+                <div id="turnstile-widget" aria-label="Cloudflare 人機驗證"></div>
+                <p id="turnstile-status" role="status" aria-live="polite">正在載入安全驗證…</p>
+                <p class="usage-notice">為維持服務穩定，每個網路每小時最多產生 5 份教案、下載 Word 10 次；額外輸入最多 2,000 字。</p>
             </div>
             <button type="submit" class="generate-button">激發教案靈感(供參考)</button>
         </form>
