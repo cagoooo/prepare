@@ -3,6 +3,7 @@ const { defineSecret } = require("firebase-functions/params");
 const { GoogleGenerativeAI } = require("@google/generative-ai");
 const line = require("@line/bot-sdk");
 const HTMLtoDOCX = require("html-to-docx");
+const JSZip = require("jszip");
 const admin = require("firebase-admin");
 
 // ─── 初始化 Firebase Admin (用於 Storage 操作) ───────────────────────────────
@@ -72,8 +73,8 @@ function createFlexMessage(data, bodyContents, downloadUrl) {
 }
 
 // ─── 解析 HTML 並轉為 Flex Body ─────────────────────────────────────────────
-const { JSDOM } = require("jsdom");
 function parseHtmlToFlexBody(htmlContent) {
+    const { JSDOM } = require("jsdom");
     const dom = new JSDOM(htmlContent);
     const rows = dom.window.document.querySelectorAll("tr");
     const bodyContents = [];
@@ -157,6 +158,67 @@ function parseHtmlToFlexBody(htmlContent) {
     return bodyContents;
 }
 
+// html-to-docx may emit OOXML elements and attributes in an order Word rejects.
+async function repairDocxPackage(docxBuffer) {
+    const { JSDOM } = require("jsdom");
+    const wordNamespace = "http://schemas.openxmlformats.org/wordprocessingml/2006/main";
+    const zip = await JSZip.loadAsync(docxBuffer);
+    const documentXml = zip.file("word/document.xml");
+    if (!documentXml) {
+        throw new Error("DOCX 缺少主要文件內容，無法產生有效的 Word 檔案。");
+    }
+
+    const xml = await documentXml.async("string");
+    const dom = new JSDOM(xml, { contentType: "application/xml" });
+    const document = dom.window.document;
+    const body = document.getElementsByTagNameNS(wordNamespace, "body")[0];
+    if (!body) {
+        throw new Error("DOCX 缺少文件本文，無法產生有效的 Word 檔案。");
+    }
+
+    const sectionProperties = Array.from(body.children).find(node => node.localName === "sectPr");
+    if (sectionProperties) body.appendChild(sectionProperties);
+
+    const pageMarginDefaults = { top: 900, right: 900, bottom: 900, left: 900, header: 450, footer: 450, gutter: 0 };
+    for (const pageMargins of document.getElementsByTagNameNS(wordNamespace, "pgMar")) {
+        for (const [name, fallback] of Object.entries(pageMarginDefaults)) {
+            const value = pageMargins.getAttributeNS(wordNamespace, name);
+            if (!value || value === "undefined" || !/^\d+$/.test(value)) {
+                pageMargins.setAttributeNS(wordNamespace, `w:${name}`, String(fallback));
+            }
+        }
+    }
+
+    const reorderChildren = (parent, names) => {
+        const rank = new Map(names.map((name, index) => [name, index]));
+        Array.from(parent.children)
+            .sort((left, right) => (rank.get(left.localName) ?? Number.MAX_SAFE_INTEGER)
+                - (rank.get(right.localName) ?? Number.MAX_SAFE_INTEGER))
+            .forEach(node => parent.appendChild(node));
+    };
+    const tablePropertyOrder = [
+        "tblStyle", "tblpPr", "tblOverlap", "bidiVisual", "tblStyleRowBandSize",
+        "tblStyleColBandSize", "tblW", "jc", "tblInd", "tblCellSpacing",
+        "tblBorders", "shd", "tblLayout", "tblCellMar", "tblLook", "tblCaption",
+        "tblDescription",
+    ];
+    for (const properties of document.getElementsByTagNameNS(wordNamespace, "tblPr")) {
+        reorderChildren(properties, tablePropertyOrder);
+    }
+    const borderOrder = ["top", "left", "bottom", "right", "insideH", "insideV", "tl2br", "tr2bl"];
+    for (const elementName of ["tblBorders", "tcBorders"]) {
+        for (const borders of document.getElementsByTagNameNS(wordNamespace, elementName)) {
+            reorderChildren(borders, borderOrder);
+        }
+    }
+    for (const margins of document.getElementsByTagNameNS(wordNamespace, "tblCellMar")) {
+        reorderChildren(margins, ["top", "left", "bottom", "right"]);
+    }
+
+    zip.file("word/document.xml", new dom.window.XMLSerializer().serializeToString(document));
+    return zip.generateAsync({ type: "nodebuffer", compression: "DEFLATE" });
+}
+
 // ─── generatePlan Cloud Function ────────────────────────────────────────────
 exports.generatePlan = onRequest(
     { secrets: [GEMINI_API_KEY, LINE_CHANNEL_ACCESS_TOKEN, LINE_USER_ID], region: "asia-east1", cors: "https://cagoooo.github.io" },
@@ -234,13 +296,14 @@ exports.generatePlan = onRequest(
             let downloadUrl = null;
             try {
                 const styledHtml = `<!DOCTYPE html><html><head><style>body { font-family: 'Microsoft JhengHei', sans-serif; font-size: 11pt; } table { border-collapse: collapse; width: 100%; } th, td { border: 1px solid #000; padding: 8px; vertical-align: top; } th { background-color: #D9EAD3; font-weight: bold; }</style></head><body>${content}</body></html>`;
-                const docxBuffer = await HTMLtoDOCX(styledHtml, null, {
+                const generatedDocx = await HTMLtoDOCX(styledHtml, null, {
                     table: { row: { cantSplit: true } },
-                    margin: { top: 720, bottom: 720, left: 1080, right: 1080 },
+                    margins: { top: 720, bottom: 720, left: 1080, right: 1080, header: 720, footer: 720, gutter: 0 },
                 });
 
                 const downloadToken = `token_${Date.now()}`;
-                const fileName = `lesson_plans/${Date.now()}_${unit.replace(/\s+/g, "_")}.docx`;
+                const docxBuffer = await repairDocxPackage(generatedDocx);
+                    const fileName = `lesson_plans/${Date.now()}_${unit.replace(/\s+/g, "_")}.docx`;
                 const file = bucket.file(fileName);
                 await file.save(Buffer.from(docxBuffer), {
                     metadata: {
@@ -308,6 +371,7 @@ exports.downloadDocx = onRequest({ region: "asia-east1", cors: "https://cagoooo.
             return res.status(400).json({ error: "缺少 html_content 欄位" });
         }
 
+        const { JSDOM } = require("jsdom");
         const dom = new JSDOM(html_content);
         const document = dom.window.document;
         const normalizeText = value => String(value || "")
@@ -370,17 +434,18 @@ exports.downloadDocx = onRequest({ region: "asia-east1", cors: "https://cagoooo.
 <body>${finalHtmlContent}</body>
 </html>`;
 
-        const docxBuffer = await HTMLtoDOCX(styledHtml, null, {
+        const generatedDocx = await HTMLtoDOCX(styledHtml, null, {
             table: { row: { cantSplit: true } },
             pageSize: { width: 11906, height: 16838 },
-            margins: { top: 900, bottom: 900, left: 900, right: 900 },
+            margins: { top: 900, bottom: 900, left: 900, right: 900, header: 450, footer: 450, gutter: 0 },
             font: "Microsoft JhengHei",
             fontSize: 22,
             complexScriptFontSize: 22,
             lang: "zh-TW",
         });
 
-        res.setHeader("Content-Disposition", "attachment; filename=lesson_plan.docx");
+        const docxBuffer = await repairDocxPackage(generatedDocx);
+            res.setHeader("Content-Disposition", "attachment; filename=lesson_plan.docx");
         res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.wordprocessingml.document");
         return res.send(Buffer.from(docxBuffer));
     } catch (err) {

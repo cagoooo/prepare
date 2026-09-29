@@ -167,7 +167,25 @@ function downloadDocx(htmlContent) {
         },
         body: JSON.stringify({ html_content: htmlContent }),
     })
-        .then(response => response.blob())
+        .then(async response => {
+            if (!response.ok) {
+                let errorMessage = `下載失敗（HTTP ${response.status}）`;
+                try {
+                    const errorData = await response.json();
+                    if (errorData.error) errorMessage += `：${errorData.error}`;
+                } catch (_) {
+                    // 錯誤回應不是 JSON 時保留 HTTP 狀態訊息。
+                }
+                throw new Error(errorMessage);
+            }
+
+            const contentType = response.headers.get('content-type') || '';
+            if (!contentType.includes('application/vnd.openxmlformats-officedocument.wordprocessingml.document')) {
+                throw new Error('伺服器回傳內容不是有效的 Word 檔案。');
+            }
+
+            return response.blob();
+        })
         .then(blob => {
             clearInterval(interval);
             const fill = document.getElementById('progress-fill');
@@ -195,6 +213,6 @@ function downloadDocx(htmlContent) {
             console.error('Error downloading file:', error);
             if (progressContainer) progressContainer.style.display = 'none';
             loadingText.textContent = originalText;
-            alert('下載失敗，請稍後再試。');
+            alert(error.message || '下載失敗，請稍後再試。');
         });
 }
