@@ -159,7 +159,7 @@ function parseHtmlToFlexBody(htmlContent) {
 
 // ─── generatePlan Cloud Function ────────────────────────────────────────────
 exports.generatePlan = onRequest(
-    { secrets: [GEMINI_API_KEY, LINE_CHANNEL_ACCESS_TOKEN, LINE_USER_ID], region: "asia-east1", cors: true },
+    { secrets: [GEMINI_API_KEY, LINE_CHANNEL_ACCESS_TOKEN, LINE_USER_ID], region: "asia-east1", cors: "https://cagoooo.github.io" },
     async (req, res) => {
         // 註：onRequest 已設定 cors: true，Firebase 會自動處理 CORS 預檢與標頭。
         if (req.method !== "POST") {
@@ -298,7 +298,7 @@ exports.generatePlan = onRequest(
 );
 
 // ─── downloadDocx Cloud Function ────────────────────────────────────────────
-exports.downloadDocx = onRequest({ region: "asia-east1", cors: true }, async (req, res) => {
+exports.downloadDocx = onRequest({ region: "asia-east1", cors: "https://cagoooo.github.io" }, async (req, res) => {
     if (req.method !== "POST") {
         return res.status(405).json({ error: "Method Not Allowed" });
     }
