@@ -5,8 +5,61 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>桃園市石門國小數位備課小幫手</title>
-    <link rel="icon" type="image/x-icon" href="/prepare/assets/write-C_2xZw2w.ico">
-  <script type="module" crossorigin src="/prepare/assets/index-DDoUIQRp.js"></script>
+    <meta name="description" content="石門國小教師數位備課小幫手：輸入教學領域、年級與單元，AI 協助激發符合十二年國教格式的教案靈感，並可一鍵下載 Word。">
+    <meta name="app-version" content="25-baeeb3b558611057031fb923ad4a14fb1ebda2ad">
+    <meta name="theme-color" content="#e73c7e">
+    <link rel="canonical" href="https://cagoooo.github.io/prepare/">
+
+    <!-- 網站圖示與 PWA -->
+    <link rel="icon" href="/prepare/favicon.ico" sizes="any">
+    <link rel="icon" type="image/png" sizes="32x32" href="/prepare/favicon-32.png">
+    <link rel="apple-touch-icon" href="/prepare/apple-touch-icon.png">
+    <link rel="manifest" href="/prepare/manifest.webmanifest">
+    <meta name="apple-mobile-web-app-title" content="備課小幫手">
+
+    <!-- 社群分享卡片（LINE / Facebook / X）：網址必須是絕對路徑 -->
+    <meta property="og:type" content="website">
+    <meta property="og:locale" content="zh_TW">
+    <meta property="og:site_name" content="石門國小教師數位備課小幫手">
+    <meta property="og:title" content="教師數位備課小幫手｜桃園市石門國小">
+    <meta property="og:description" content="輸入教學領域、年級與單元，AI 協助激發十二年國教教案靈感，還能一鍵下載 Word，老師備課好幫手！">
+    <meta property="og:url" content="https://cagoooo.github.io/prepare/">
+    <meta property="og:image" content="https://cagoooo.github.io/prepare/og-image.png?v=4781b167">
+    <meta property="og:image:secure_url" content="https://cagoooo.github.io/prepare/og-image.png?v=4781b167">
+    <meta property="og:image:type" content="image/png">
+    <meta property="og:image:width" content="1200">
+    <meta property="og:image:height" content="630">
+    <meta property="og:image:alt" content="教師數位備課小幫手：AI 教案生成、一鍵下載 Word">
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="教師數位備課小幫手｜桃園市石門國小">
+    <meta name="twitter:description" content="輸入教學領域、年級與單元，AI 協助激發十二年國教教案靈感，還能一鍵下載 Word。">
+    <meta name="twitter:image" content="https://cagoooo.github.io/prepare/og-image.png?v=4781b167">
+
+    <script>
+        // 舊頁面指向已被新版刪除的檔案時（換版後的 404），自動清除快取重新載入一次
+        window.addEventListener('error', function (event) {
+            var el = event.target;
+            var src = el && (el.src || el.href);
+            if (!src || String(src).indexOf('/assets/') === -1) return;
+            try {
+                if (sessionStorage.getItem('prepare-asset-reload') === '1') return;
+                sessionStorage.setItem('prepare-asset-reload', '1');
+            } catch (e) { }
+            var jobs = [];
+            if ('serviceWorker' in navigator) {
+                jobs.push(navigator.serviceWorker.getRegistrations().then(function (regs) {
+                    return Promise.all(regs.map(function (r) { return r.unregister(); }));
+                }));
+            }
+            if (window.caches) {
+                jobs.push(caches.keys().then(function (keys) {
+                    return Promise.all(keys.map(function (k) { return caches.delete(k); }));
+                }));
+            }
+            Promise.all(jobs).catch(function () { }).then(function () { location.reload(); });
+        }, true);
+    </script>
+  <script type="module" crossorigin src="/prepare/assets/index-BL-heg3o.js"></script>
   <link rel="stylesheet" crossorigin href="/prepare/assets/index-Fp-H2hAu.css">
 </head>
 
@@ -67,9 +120,10 @@
         </a>
     </div>
     <div id="feedback-container">
-        <a href="https://forms.gle/NUQK73gFNJAGQir5A" target="_blank" id="feedback-link">
-            <span class="feedback-icon">📝</span>
-            <span class="feedback-text">歡迎提供使用回饋</span>
+        <a href="https://cagoooo.github.io/Akai/wish/" target="_blank" rel="noopener" id="feedback-link"
+            title="前往阿凱老師教育科技專區留言回饋、許願新工具">
+            <span class="feedback-icon">💡</span>
+            <span class="feedback-text">回饋許願｜阿凱老師教育專區</span>
         </a>
     </div>
     <footer class="modern-footer">
