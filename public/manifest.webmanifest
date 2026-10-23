@@ -1,0 +1,16 @@
+{
+  "name": "教師數位備課小幫手｜石門國小",
+  "short_name": "備課小幫手",
+  "description": "輸入教學領域、年級與單元，AI 協助激發符合十二年國教格式的教案靈感，並可一鍵下載 Word。",
+  "lang": "zh-Hant-TW",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#fdf2f7",
+  "theme_color": "#e73c7e",
+  "icons": [
+    { "src": "icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}

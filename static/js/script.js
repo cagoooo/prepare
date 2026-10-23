@@ -1,3 +1,7 @@
+import { initServiceWorker } from './sw-update.js';
+
+initServiceWorker();
+
 // API 端點切換：使用 Firebase 2nd Gen 獨立功能網址 (解決 CORS 與網址代溝)
 const GENERATE_PLAN_URL = 'https://asia-east1-teacher-c571b.cloudfunctions.net/generatePlan';
 const DOWNLOAD_DOCX_URL = 'https://asia-east1-teacher-c571b.cloudfunctions.net/downloadDocx';
