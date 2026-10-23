@@ -41,6 +41,13 @@
    python app.py
    ```
 
+## 📱 網站圖示、分享卡片與版本更新通知
+
+- **圖示與分享圖**：`public/` 內的 favicon、PWA 圖示與 `og-image.png`（1200×630）由 `python scripts/generate_brand_assets.py` 產生（需 Pillow 與微軟正黑體）。改圖後重新執行再 commit 即可，`og:image` 網址會自動帶新的內容雜湊，LINE / Facebook 才會抓新圖。
+- **版本號**：GitHub Actions 以 `run number-commit` 注入到 `sw.js` 與 `<meta name="app-version">`，不需手動升版。
+- **更新通知**：使用者開著網頁時若有新部署，畫面會跳出「有新版本」通知列，按下即重新整理載入最新版。網址加 `?swdemo=1` 可預覽通知列樣式。
+- Facebook 若仍顯示舊預覽圖，到 [分享偵錯工具](https://developers.facebook.com/tools/debug/) 貼上網址並按「重新擷取」。
+
 ## 🌐 部署至 GitHub 的說明
 雖然 GitHub Pages 不支援運行具有後端的 Flask 程式，但您可以將代碼託管於 GitHub，並透過以下平台進行部署：
 - **Render.com** (推薦，部署設定最簡單)
