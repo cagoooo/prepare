@@ -1,7 +1,7 @@
 // 備課小幫手 Service Worker
-// 26-a40dbcdc33251cdce6a34448da603ba0d2f6984e 於 build 時由 vite.config.js 換成「CI run number-commit hash」，
+// 27-fda1e27b408f5a60f8af32ef35b2b8c1c11283ec 於 build 時由 vite.config.js 換成「CI run number-commit hash」，
 // 每個新 commit 都會讓 sw.js 內容改變，瀏覽器才偵測得到新版。
-const VERSION = '26-a40dbcdc33251cdce6a34448da603ba0d2f6984e';
+const VERSION = '27-fda1e27b408f5a60f8af32ef35b2b8c1c11283ec';
 const CACHE_PREFIX = 'prepare-';
 const CACHE = `${CACHE_PREFIX}${VERSION}`;
 
