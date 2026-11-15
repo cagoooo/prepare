@@ -11,6 +11,16 @@ const { getFirestore, Timestamp } = require("firebase-admin/firestore");
 const cors = require("cors")({ origin: "https://cagoooo.github.io" });
 const OpenCC = require("opencc-js");
 const { notifyGoogleChat, getClientIp: getChatClientIp, maskIp, truncate } = require("./notify-google-chat");
+// 漢語新解三道防線（Google 登入 → Turnstile → 每日 5 次）；與 cagoooo/words 的 functions/words-guard.js 同一份
+const {
+    DAILY_LIMIT: WORDS_DAILY_LIMIT,
+    GuardError: WordsGuardError,
+    requireGoogleUser: wordsRequireGoogleUser,
+    verifyTurnstile: wordsVerifyTurnstile,
+    consumeDailyQuota: wordsConsumeDailyQuota,
+    refundDailyQuota: wordsRefundDailyQuota,
+    describeUser: wordsDescribeUser
+} = require("./words-guard");
 
 // ─── Words 專案常數 ────────────────────────────────────────────────────────
 const WORDS_SYSTEM_PROMPT = `你是年輕人,批判現實,思考深刻,語言風趣。
@@ -34,6 +44,8 @@ const TURNSTILE_SECRET = defineSecret("PREPARE_TURNSTILE_SECRET");
 const RATE_LIMIT_HMAC_KEY = defineSecret("PREPARE_RATE_LIMIT_HMAC_KEY");
 // Google Chat 通知網址：漢語新解（generateExplanation）每次被使用都通知網站主人
 const GOOGLE_CHAT_WEBHOOK_URL = defineSecret("GOOGLE_CHAT_WEBHOOK_URL");
+// 漢語新解的 Cloudflare Turnstile secret（與 PIRLS 共用同一個 widget）
+const WORDS_TURNSTILE_SECRET = defineSecret("WORDS_TURNSTILE_SECRET");
 
 const TURNSTILE_VERIFY_URL = "https://challenges.cloudflare.com/turnstile/v0/siteverify";
 const TURNSTILE_EXPECTED_HOSTNAME = "cagoooo.github.io";
@@ -656,22 +668,26 @@ const WORDS_MAX_REQUESTS = 5;
 exports.generateExplanation = onRequest({
     region: "asia-east1",
     cors: true,
-    secrets: [GEMINI_API_KEY, GOOGLE_CHAT_WEBHOOK_URL]
+    secrets: [GEMINI_API_KEY, GOOGLE_CHAT_WEBHOOK_URL, WORDS_TURNSTILE_SECRET]
 }, async (req, res) => {
     return cors(req, res, async () => {
         const startedAt = Date.now();
         const clientIp = getChatClientIp(req);
-        // 沒有登入身分，通知只帶查詢詞語（前 20 字）與遮蔽末段的來源 IP
+        let user = null;
+        let quota = null;
+        // 通知卡：使用者名稱／Email、查詢詞語（前 20 字）、遮蔽末段的來源 IP、今日剩餘次數
         const report = (status, extra = {}) => notifyGoogleChat({
             status,
             siteName: "漢語新解",
             feature: "AI 詞語新解",
             durationMs: Date.now() - startedAt,
             ip: clientIp,
+            user: wordsDescribeUser(user) || undefined,
             ...extra,
             fields: [
                 { label: "查詢詞語", value: truncate((req.body && req.body.input) || "（空白）", 20) || "（空白）" },
                 { label: "來源 IP", value: maskIp(clientIp) },
+                ...(quota ? [{ label: "今日剩餘次數", value: `${quota.remaining} / ${WORDS_DAILY_LIMIT}` }] : []),
                 ...(extra.fields || [])
             ]
         });
@@ -694,46 +710,76 @@ exports.generateExplanation = onRequest({
             recentRequests.push(now);
             wordsRateLimit.set(ip, recentRequests);
 
-            const inputWord = (req.body && req.body.input) || "";
-            if (!inputWord) {
-                await report("failed", { error: "未提供輸入" });
-                return res.status(400).json({ error: "未提供輸入" });
+            const inputWord = String((req.body && req.body.input) || "").trim();
+
+            // 三道防線：① Google 登入 → ② Turnstile 人機驗證 → ③ 每日次數（通過人機驗證才扣）
+            try {
+                user = await wordsRequireGoogleUser(req);
+                if (!inputWord) {
+                    await report("failed", { error: "未提供輸入" });
+                    return res.status(400).json({ error: "請輸入一個漢語詞彙" });
+                }
+                if (Array.from(inputWord).length > 50) {
+                    await report("failed", { error: "輸入過長" });
+                    return res.status(400).json({ error: "詞彙太長了，請輸入 50 字以內" });
+                }
+                await wordsVerifyTurnstile(req.body && req.body.turnstileToken, WORDS_TURNSTILE_SECRET.value(), clientIp);
+                quota = await wordsConsumeDailyQuota(user);
+            } catch (guardErr) {
+                if (guardErr instanceof WordsGuardError) {
+                    if (guardErr.status === 429) quota = { remaining: 0 };
+                    console.warn(`generateExplanation blocked: ${guardErr.status} ${guardErr.extra && guardErr.extra.code}`);
+                    await report("blocked", { fields: [{ label: "HTTP 狀態", value: `${guardErr.status}（${guardErr.message}）` }] });
+                    return res.status(guardErr.status).json({ error: guardErr.message, ...guardErr.extra });
+                }
+                throw guardErr;
             }
 
-            const apiKey = GEMINI_API_KEY.value();
-            const genAI = new GoogleGenerativeAI(apiKey);
-            const model = genAI.getGenerativeModel({
-                model: "gemini-2.5-flash-lite",
-                systemInstruction: WORDS_SYSTEM_PROMPT,
-                generationConfig: {
-                    responseMimeType: "application/json",
-                    thinkingConfig: { thinkingBudget: 0 }
-                }
-            });
+            try {
+                const apiKey = GEMINI_API_KEY.value();
+                const genAI = new GoogleGenerativeAI(apiKey);
+                const model = genAI.getGenerativeModel({
+                    model: "gemini-2.5-flash-lite",
+                    systemInstruction: WORDS_SYSTEM_PROMPT,
+                    generationConfig: {
+                        responseMimeType: "application/json",
+                        thinkingConfig: { thinkingBudget: 0 }
+                    }
+                });
 
-            console.log(`Requesting explanation for: ${inputWord}`);
-            const result = await model.generateContent(`請解釋這個詞：「${inputWord}」`);
-            const response = await result.response;
-            const responseText = response.text();
-            const data = JSON.parse(responseText);
+                console.log(`Requesting explanation (uid=${user.uid}, remaining=${quota.remaining})`);
+                const result = await model.generateContent(`請解釋這個詞：「${inputWord}」`);
+                const response = await result.response;
+                const responseText = response.text();
+                const data = JSON.parse(responseText);
 
-            // Convert to Traditional Chinese (Taiwan mapping)
-            const converter = OpenCC.Converter({ from: 'cn', to: 'twp' });
-            let explanation = converter(data.explanation);
+                // Convert to Traditional Chinese (Taiwan mapping)
+                const converter = OpenCC.Converter({ from: 'cn', to: 'twp' });
+                let explanation = converter(data.explanation);
 
-            // Format to bullet points
-            const bulletPoints = convertToBulletPoints(explanation);
+                // Format to bullet points
+                const bulletPoints = convertToBulletPoints(explanation);
 
-            await report("success", { fields: [{ label: "情感色調", value: String(data.mood || "—") }] });
-            return res.status(200).json({
-                explanation: bulletPoints,
-                mood: data.mood
-            });
+                await report("success", { fields: [{ label: "情感色調", value: String(data.mood || "—") }] });
+                return res.status(200).json({
+                    explanation: bulletPoints,
+                    mood: data.mood,
+                    remaining: quota.remaining,
+                    limit: WORDS_DAILY_LIMIT
+                });
+            } catch (aiErr) {
+                // AI 失敗不算次數：退回剛扣的那一次
+                await wordsRefundDailyQuota(user, quota.date);
+                quota.remaining += 1;
+                console.error("generateExplanation AI error:", aiErr);
+                await report("failed", { error: (aiErr && aiErr.message) || String(aiErr) });
+                return res.status(500).json({ error: "AI 生成失敗，請稍後再試（這次不扣次數）", remaining: quota.remaining, limit: WORDS_DAILY_LIMIT });
+            }
 
         } catch (err) {
             console.error("generateExplanation error:", err);
             await report("failed", { error: (err && err.message) || String(err) });
-            return res.status(500).json({ error: "AI 生成失敗，請稍後再試", detail: err.message });
+            return res.status(500).json({ error: "伺服器暫時無法處理，請稍後再試" });
         }
     });
 });
