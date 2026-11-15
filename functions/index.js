@@ -10,7 +10,7 @@ const net = require("node:net");
 const { getFirestore, Timestamp } = require("firebase-admin/firestore");
 const cors = require("cors")({ origin: "https://cagoooo.github.io" });
 const OpenCC = require("opencc-js");
-const { notifyGoogleChat, getClientIp: getChatClientIp, maskIp, truncate } = require("./notify-google-chat");
+const { notifyGoogleChat, getClientIp: getChatClientIp, maskIp, safeUserText } = require("./notify-google-chat");
 // 漢語新解三道防線（Google 登入 → Turnstile → 每日 5 次）；與 cagoooo/words 的 functions/words-guard.js 同一份
 const {
     DAILY_LIMIT: WORDS_DAILY_LIMIT,
@@ -685,7 +685,8 @@ exports.generateExplanation = onRequest({
             user: wordsDescribeUser(user) || undefined,
             ...extra,
             fields: [
-                { label: "查詢詞語", value: truncate((req.body && req.body.input) || "（空白）", 20) || "（空白）" },
+                // 非 UTF-8 送來的亂碼（U+FFFD）或控制字元一律過濾，改顯示「（無法辨識的文字，已過濾）」
+                { label: "查詢詞語", value: (req.body && req.body.input) ? safeUserText(req.body.input, 20) : "（空白）" },
                 { label: "來源 IP", value: maskIp(clientIp) },
                 ...(quota ? [{ label: "今日剩餘次數", value: `${quota.remaining} / ${WORDS_DAILY_LIMIT}` }] : []),
                 ...(extra.fields || [])

@@ -64,6 +64,28 @@ function truncate(value, max) {
     return chars.length > max ? chars.slice(0, max).join('') + '…' : chars.join('')
 }
 
+const GARBLED_PLACEHOLDER = '（無法辨識的文字，已過濾）'
+
+/** 去掉亂碼替代字元 U+FFFD 與控制字元（\p{Cc}，換行、Tab 也算，改成空白） */
+function stripGarbled(value) {
+    return String(value == null ? '' : value)
+        .replace(/�/g, '')
+        .replace(/\p{Cc}/gu, ' ')
+        .replace(/ {2,}/g, ' ')
+        .trim()
+}
+
+/**
+ * 使用者輸入的文字（例如查詢詞語）放進通知卡前先過濾：
+ * 原字串含 U+FFFD（非 UTF-8 送來的亂碼）或清完是空的 → 顯示「（無法辨識的文字，已過濾）」
+ */
+function safeUserText(value, max) {
+    const raw = String(value == null ? '' : value)
+    const cleaned = truncate(stripGarbled(raw), max)
+    if (raw.includes('�') || !cleaned) return GARBLED_PLACEHOLDER
+    return cleaned
+}
+
 function shouldNotifyBlocked(ip) {
     const key = String(ip || 'unknown')
     const now = Date.now()
@@ -121,6 +143,13 @@ async function notifyGoogleChat(info) {
         }
         if (info.error) fields.push({ label: '錯誤摘要', value: truncate(info.error, 120) })
 
+        // 卡片欄位與上方摘要文字都不放亂碼（U+FFFD）與控制字元
+        for (const f of fields) {
+            const raw = String(f.value == null ? '' : f.value)
+            f.label = stripGarbled(f.label)
+            f.value = raw.includes('�') ? GARBLED_PLACEHOLDER : stripGarbled(raw)
+        }
+
         const text = [title, ...fields.map((f) => `${f.label}：${f.value || '—'}`)]
             .join('\n')
             .slice(0, 4000)
@@ -158,4 +187,4 @@ async function notifyGoogleChat(info) {
     }
 }
 
-module.exports = { notifyGoogleChat, getClientIp, maskIp, truncate }
+module.exports = { notifyGoogleChat, getClientIp, maskIp, truncate, safeUserText }
