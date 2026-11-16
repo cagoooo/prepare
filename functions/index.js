@@ -21,6 +21,8 @@ const {
     refundDailyQuota: wordsRefundDailyQuota,
     describeUser: wordsDescribeUser
 } = require("./words-guard");
+// 備課小幫手每日次數（Google 登入 → Turnstile → 每人每天 5 次）
+const { PLAN_DAILY_LIMIT, consumePlanQuota, refundPlanQuota } = require("./prepare-guard");
 
 // ─── Words 專案常數 ────────────────────────────────────────────────────────
 const WORDS_SYSTEM_PROMPT = `你是年輕人,批判現實,思考深刻,語言風趣。
@@ -54,6 +56,17 @@ const RATE_LIMIT_WINDOW_MS = 60 * 60 * 1000;
 const MAX_PLAN_INPUT_CHARS = 2000;
 const MAX_PLAN_BODY_BYTES = 24 * 1024;
 const MAX_DOCX_BODY_BYTES = 250 * 1024;
+const PLAN_IP_HOURLY_LIMIT = 30;
+
+// 通知卡的「主題」：年級＋領域＋單元，最多 30 字，亂碼（U+FFFD）與控制字元會被過濾
+function planTopicForNotify(body) {
+    if (!body || typeof body !== "object" || Array.isArray(body)) return "（空白）";
+    const pick = value => (typeof value === "string" ? value.trim() : "");
+    const head = [pick(body.grade), pick(body.subject)].filter(Boolean).join(" ");
+    const unit = pick(body.unit);
+    const topic = [head, unit].filter(Boolean).join("｜");
+    return topic ? safeUserText(topic, 30) : "（空白）";
+}
 
 function getClientIp(req) {
     const candidate = String(req.ip || req.socket?.remoteAddress || "").trim().replace(/^::ffff:/, "");
@@ -367,7 +380,7 @@ async function repairDocxPackage(docxBuffer) {
 // ─── generatePlan Cloud Function ────────────────────────────────────────────
 exports.generatePlan = onRequest(
     {
-        secrets: [GEMINI_API_KEY, LINE_CHANNEL_ACCESS_TOKEN, LINE_USER_ID, TURNSTILE_SECRET, RATE_LIMIT_HMAC_KEY],
+        secrets: [GEMINI_API_KEY, LINE_CHANNEL_ACCESS_TOKEN, LINE_USER_ID, TURNSTILE_SECRET, RATE_LIMIT_HMAC_KEY, GOOGLE_CHAT_WEBHOOK_URL],
         region: "asia-east1",
         cors: "https://cagoooo.github.io",
         serviceAccount: "prepare-plan-runtime@teacher-c571b.iam.gserviceaccount.com",
@@ -376,50 +389,98 @@ exports.generatePlan = onRequest(
     },
     async (req, res) => {
         return cors(req, res, async () => {
+            const startedAt = Date.now();
+            const clientIp = getChatClientIp(req);
+            let user = null;
+            let quota = null;
+            // Google Chat 通知卡：使用者、功能、耗時、今日剩餘；只放主題前 30 字（過濾亂碼），不放教案內容
+            const report = (status, extra = {}) => notifyGoogleChat({
+                status,
+                siteName: "教師數位備課小幫手",
+                feature: "AI 產生教案",
+                durationMs: Date.now() - startedAt,
+                ip: clientIp,
+                user: wordsDescribeUser(user) || undefined,
+                ...extra,
+                fields: [
+                    { label: "主題", value: planTopicForNotify(req.body) },
+                    { label: "來源 IP", value: maskIp(clientIp) },
+                    ...(quota ? [{ label: "今日剩餘次數", value: `${quota.remaining} / ${PLAN_DAILY_LIMIT}` }] : []),
+                    ...(extra.fields || [])
+                ]
+            });
+            const block = async (status, payload) => {
+                await report("blocked", { fields: [{ label: "HTTP 狀態", value: `${status}（${payload.error}）` }] });
+                return res.status(status).json({ success: false, ...payload });
+            };
             try {
                 if (req.method !== "POST") {
-                    return res.status(405).json({ error: "Method Not Allowed" });
+                    return block(405, { error: "Method Not Allowed" });
                 }
                 if (requestBodySize(req) > MAX_PLAN_BODY_BYTES) {
-                    return res.status(413).json({ success: false, error: "輸入內容過長，請縮短後再試。" });
+                    return block(413, { error: "輸入內容過長，請縮短後再試。" });
+                }
+
+                // ① 必須用 Google 帳號登入（匿名不算）
+                try {
+                    user = await wordsRequireGoogleUser(req);
+                } catch (authErr) {
+                    if (authErr instanceof WordsGuardError) {
+                        return block(authErr.status, { error: authErr.message, ...authErr.extra });
+                    }
+                    throw authErr;
                 }
 
                 if (!req.body || typeof req.body !== "object" || Array.isArray(req.body)) {
-                    return res.status(400).json({ success: false, error: "請提供有效的教案資料。" });
+                    return block(400, { error: "請提供有效的教案資料。" });
                 }
                 const { subject, grade, unit, duration, objectives, materials, methods, details, turnstileToken } = req.body;
                 const inputFields = { subject, grade, unit, duration, objectives, materials, methods, details };
                 for (const [field, value] of Object.entries(inputFields)) {
                     if (value !== undefined && value !== null && typeof value !== "string") {
-                        return res.status(400).json({ success: false, error: `欄位 ${field} 格式不正確。` });
+                        return block(400, { error: `欄位 ${field} 格式不正確。` });
                     }
                 }
                 if (![subject, grade, unit].every(value => typeof value === "string" && value.trim())) {
-                    return res.status(400).json({ error: "缺少必填欄位：subject, grade, unit" });
+                    return block(400, { error: "缺少必填欄位：教學領域、實施年級、單元名稱" });
                 }
                 const totalInputChars = Object.values(inputFields)
                     .reduce((total, value) => total + (typeof value === "string" ? value.length : 0), 0);
                 if (totalInputChars > MAX_PLAN_INPUT_CHARS) {
-                    return res.status(413).json({ success: false, error: `輸入文字總長度不可超過 ${MAX_PLAN_INPUT_CHARS} 字。` });
+                    return block(413, { error: `輸入文字總長度不可超過 ${MAX_PLAN_INPUT_CHARS} 字。` });
                 }
 
+                // ② Cloudflare Turnstile 人機驗證
                 const verification = await verifyTurnstileToken(turnstileToken);
                 if (!verification.ok) {
-                    return res.status(verification.status).json({ success: false, error: verification.error });
+                    return block(verification.status, { error: verification.error });
                 }
 
+                // 同一網路的保險絲（學校共用網路，放寬到每小時 30 次；真正的限制是下面的每人每天 5 次）
                 let generationLimit;
                 try {
-                    generationLimit = await consumeRateLimit(req, "plan_generation", 5);
+                    generationLimit = await consumeRateLimit(req, "plan_generation", PLAN_IP_HOURLY_LIMIT);
                 } catch (rateLimitError) {
                     logSafeError("Plan generation rate limiter unavailable", rateLimitError);
-                    return res.status(503).json({ success: false, error: "使用量保護暫時無法存取，請稍後再試。" });
+                    return block(503, { error: "使用量保護暫時無法存取，請稍後再試。" });
                 }
                 if (!generationLimit.allowed) {
-                    return res.status(429)
-                        .set("Retry-After", String(generationLimit.retryAfterSeconds))
-                        .json({ success: false, error: "每個網路每小時最多可產生 5 份教案，請稍後再試。" });
+                    res.set("Retry-After", String(generationLimit.retryAfterSeconds));
+                    return block(429, { error: `同一個網路每小時最多可產生 ${PLAN_IP_HOURLY_LIMIT} 份教案，請稍後再試。` });
                 }
+
+                // ③ 每位登入使用者每天最多 5 次（台北時間午夜重置）
+                try {
+                    quota = await consumePlanQuota(rateLimitDb, user);
+                } catch (quotaErr) {
+                    if (quotaErr instanceof WordsGuardError) {
+                        if (quotaErr.status === 429) quota = { remaining: 0 };
+                        return block(quotaErr.status, { error: quotaErr.message, ...quotaErr.extra });
+                    }
+                    logSafeError("Plan daily quota unavailable", quotaErr);
+                    return block(503, { error: "使用量保護暫時無法存取，請稍後再試。" });
+                }
+                console.log(`generatePlan allowed (uid=${user.uid}, remaining=${quota.remaining})`);
 
                 const prompt = `你是一位台灣的資深教師，請依照十二年國教課程綱要，為以下課程單元設計一份詳細的教學活動設計表（教案）。
 請完整填寫所有欄位，並以 HTML 表格格式輸出，表格包含以下欄位：
@@ -448,34 +509,49 @@ exports.generatePlan = onRequest(
 請以完整的 HTML 表格格式（使用 <table>, <tr>, <th>, <td> 標籤）輸出，不要包含任何 Markdown 語法。
 每個欄位的說明都要詳細完整，並根據台灣教育環境設計符合實際教學的內容。`;
 
-                const genAI = new GoogleGenerativeAI(GEMINI_API_KEY.value());
-                const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash-lite" });
+                let content;
+                try {
+                    const genAI = new GoogleGenerativeAI(GEMINI_API_KEY.value());
+                    const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash-lite" });
 
-                let response;
-                let retryCount = 0;
-                const maxRetries = 2;
+                    let response;
+                    let retryCount = 0;
+                    const maxRetries = 2;
 
-                while (retryCount <= maxRetries) {
-                    try {
-                        const result = await model.generateContent(prompt);
-                        response = result.response;
-                        break;
-                    } catch (aiErr) {
-                        if (aiErr.message.includes("503") || aiErr.status === 503) {
-                            retryCount++;
-                            if (retryCount <= maxRetries) {
-                                console.warn(`Gemini API 繁忙 (503)，等待 2 秒後進行第 ${retryCount} 次重試...`);
-                                await new Promise(resolve => setTimeout(resolve, 2000));
-                                continue;
+                    while (retryCount <= maxRetries) {
+                        try {
+                            const result = await model.generateContent(prompt);
+                            response = result.response;
+                            break;
+                        } catch (aiErr) {
+                            if (String(aiErr && aiErr.message).includes("503") || aiErr.status === 503) {
+                                retryCount++;
+                                if (retryCount <= maxRetries) {
+                                    console.warn(`Gemini API 繁忙 (503)，等待 2 秒後進行第 ${retryCount} 次重試...`);
+                                    await new Promise(resolve => setTimeout(resolve, 2000));
+                                    continue;
+                                }
                             }
+                            throw aiErr;
                         }
-                        throw aiErr;
                     }
-                }
 
-                let content = response.text().replace(/```html/g, "").replace(/```/g, "").trim();
-                if (content.includes("</table>")) {
-                    content = content.split("</table>")[0] + "</table>";
+                    content = response.text().replace(/```html/g, "").replace(/```/g, "").trim();
+                    if (content.includes("</table>")) {
+                        content = content.split("</table>")[0] + "</table>";
+                    }
+                    if (!content) throw new Error("Gemini 回傳空白內容");
+                } catch (aiErr) {
+                    // Gemini 失敗不算次數：退回剛扣的那一次
+                    if (await refundPlanQuota(rateLimitDb, user, quota.date)) quota.remaining += 1;
+                    logSafeError("Gemini plan generation failed", aiErr);
+                    await report("failed", { error: (aiErr && aiErr.message) || String(aiErr) });
+                    return res.status(500).json({
+                        success: false,
+                        error: "AI 產生教案失敗，請稍後再試（這次不扣次數）。",
+                        remaining: quota.remaining,
+                        limit: PLAN_DAILY_LIMIT,
+                    });
                 }
 
                 let downloadUrl = null;
@@ -524,9 +600,17 @@ exports.generatePlan = onRequest(
                     logSafeError("LINE notification failed", lineErr);
                 }
 
-                return res.json({ success: true, plan: content, html_content: content });
+                await report("success");
+                return res.json({
+                    success: true,
+                    plan: content,
+                    html_content: content,
+                    remaining: quota.remaining,
+                    limit: PLAN_DAILY_LIMIT,
+                });
             } catch (err) {
                 logSafeError("Plan generation failed", err);
+                await report("failed", { error: (err && err.message) || String(err) });
                 return res.status(500).json({ success: false, error: "教案產生失敗，請稍後再試。" });
             }
         });

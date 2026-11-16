@@ -1,4 +1,5 @@
 import { initServiceWorker } from './sw-update.js';
+import { DAILY_LIMIT, getIdToken, getSignedInUser, loginWithGoogle, logout, onUserChange } from './auth.js';
 
 initServiceWorker();
 
@@ -27,6 +28,100 @@ function loadTurnstile() {
         script.onerror = () => reject(new Error('無法載入 Cloudflare 安全驗證，請檢查網路後重新整理。'));
         document.head.appendChild(script);
     });
+}
+
+// ─── 今日剩餘次數（以伺服器回傳為準；同一天同一帳號先記在瀏覽器顯示用） ───
+function taipeiToday() {
+    return new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Taipei', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date());
+}
+
+function quotaKey(user) {
+    return `prepare-quota-${user.uid}-${taipeiToday()}`;
+}
+
+function readRemaining(user) {
+    try {
+        const value = localStorage.getItem(quotaKey(user));
+        return value === null ? null : Number(value);
+    } catch (_) {
+        return null;
+    }
+}
+
+function saveRemaining(remaining) {
+    const user = getSignedInUser();
+    if (!user || typeof remaining !== 'number' || Number.isNaN(remaining)) return;
+    try { localStorage.setItem(quotaKey(user), String(remaining)); } catch (_) { }
+    renderQuota(user);
+}
+
+function renderQuota(user) {
+    const el = document.getElementById('auth-quota');
+    if (!el || !user) return;
+    const remaining = readRemaining(user);
+    el.textContent = remaining === null
+        ? `今日最多 ${DAILY_LIMIT} 次`
+        : `今日剩餘 ${remaining} / ${DAILY_LIMIT} 次`;
+    el.classList.toggle('is-empty', remaining === 0);
+}
+
+function showAuthMessage(text, isError = false) {
+    const el = document.getElementById('auth-message');
+    if (!el) return;
+    el.textContent = text || '';
+    el.classList.toggle('is-error', !!isError);
+}
+
+function setupAuthBar() {
+    const signedOut = document.getElementById('auth-signed-out');
+    const signedIn = document.getElementById('auth-signed-in');
+    const nameEl = document.getElementById('auth-user-name');
+    const loginBtn = document.getElementById('google-login-btn');
+    const logoutBtn = document.getElementById('google-logout-btn');
+
+    onUserChange(user => {
+        signedOut.hidden = !!user;
+        signedIn.hidden = !user;
+        if (user) {
+            nameEl.textContent = user.displayName || user.email || 'Google 使用者';
+            renderQuota(user);
+            showAuthMessage('');
+        }
+    });
+
+    loginBtn.addEventListener('click', async () => {
+        loginBtn.disabled = true;
+        loginBtn.textContent = '登入中…';
+        showAuthMessage('');
+        try {
+            await loginWithGoogle();
+        } catch (error) {
+            showAuthMessage(error.message, true);
+        } finally {
+            loginBtn.disabled = false;
+            loginBtn.textContent = '使用 Google 帳號登入';
+        }
+    });
+
+    logoutBtn.addEventListener('click', () => {
+        logout().catch(() => { });
+    });
+}
+
+/** 把後端錯誤轉成老師看得懂的中文 */
+function friendlyPlanError(status, data) {
+    if (status === 401) {
+        return (data && data.code === 'auth_invalid')
+            ? '登入已過期，請按「登出」後重新用 Google 帳號登入。'
+            : '請先用 Google 帳號登入才能使用（每人每天 5 次）。';
+    }
+    if (status === 403) return (data && data.error) || '人機驗證未通過，請重新完成安全驗證後再試。';
+    if (status === 429) {
+        return (data && data.code === 'daily_limit')
+            ? '今天的 5 次已用完，明天（台北時間午夜後）再來。'
+            : (data && data.error) || '使用次數太頻繁，請稍後再試。';
+    }
+    return (data && data.error) || `教案產生失敗（HTTP ${status}），請稍後再試。`;
 }
 
 function resetTurnstile() {
@@ -59,6 +154,8 @@ document.addEventListener('DOMContentLoaded', function () {
     const resultDiv = document.getElementById('result');
     const turnstileContainer = document.getElementById('turnstile-widget');
     const turnstileStatus = document.getElementById('turnstile-status');
+
+    setupAuthBar();
 
     loadTurnstile()
         .then(turnstile => {
@@ -128,6 +225,13 @@ document.addEventListener('DOMContentLoaded', function () {
     form.addEventListener('submit', function (e) {
         e.preventDefault();
 
+        // ① 必須先用 Google 帳號登入
+        if (!getSignedInUser()) {
+            showAuthMessage('🔒 請先用 Google 帳號登入才能使用（每人每天 5 次）', true);
+            document.getElementById('auth-bar').scrollIntoView({ behavior: 'smooth', block: 'center' });
+            return;
+        }
+
         if (!turnstileToken) {
             turnstileStatus.textContent = '請先完成安全驗證，再產生教案。';
             turnstileContainer.scrollIntoView({ behavior: 'smooth', block: 'center' });
@@ -158,14 +262,32 @@ document.addEventListener('DOMContentLoaded', function () {
 
         startSmartProgress();
 
-        fetch(GENERATE_PLAN_URL, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({ subject, grade, unit, details, turnstileToken }),
-        })
-            .then(response => response.json())
+        const sentTurnstileToken = turnstileToken;
+        getIdToken()
+            .then(idToken => {
+                if (!idToken) {
+                    const err = new Error('請先用 Google 帳號登入才能使用（每人每天 5 次）。');
+                    err.friendly = true;
+                    throw err;
+                }
+                return fetch(GENERATE_PLAN_URL, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${idToken}`,
+                    },
+                    body: JSON.stringify({ subject, grade, unit, details, turnstileToken: sentTurnstileToken }),
+                });
+            })
+            .then(async response => {
+                let data = {};
+                try { data = await response.json(); } catch (_) { }
+                if (typeof data.remaining === 'number') saveRemaining(data.remaining);
+                if (!response.ok || !data.success) {
+                    return { success: false, error: friendlyPlanError(response.status, data) };
+                }
+                return data;
+            })
             .then(data => {
                 finishProgress();
                 if (data.success) {
@@ -193,7 +315,11 @@ document.addEventListener('DOMContentLoaded', function () {
 
                 } else {
                     resultDiv.style.display = 'block';
-                    resultDiv.innerHTML = `<p>生成教案時出錯：${data.error}</p>`;
+                    resultDiv.innerHTML = '';
+                    const errorP = document.createElement('p');
+                    errorP.className = 'plan-error';
+                    errorP.textContent = `生成教案時出錯：${data.error}`;
+                    resultDiv.appendChild(errorP);
                 }
                 submitButton.disabled = false;
                 submitButton.style.opacity = '1';
@@ -202,7 +328,13 @@ document.addEventListener('DOMContentLoaded', function () {
             .catch(error => {
                 finishProgress();
                 resultDiv.style.display = 'block';
-                resultDiv.innerHTML = `<p>請求出錯：${error}</p>`;
+                resultDiv.innerHTML = '';
+                const errorP = document.createElement('p');
+                errorP.className = 'plan-error';
+                errorP.textContent = error && error.friendly
+                    ? error.message
+                    : '連線失敗，請確認網路後再試一次。';
+                resultDiv.appendChild(errorP);
                 submitButton.disabled = false;
                 submitButton.style.opacity = '1';
                 submitButton.style.cursor = 'pointer';
