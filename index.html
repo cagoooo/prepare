@@ -66,7 +66,7 @@
     </script>
     <title>桃園市石門國小數位備課小幫手</title>
     <meta name="description" content="石門國小教師數位備課小幫手：輸入教學領域、年級與單元，AI 協助激發符合十二年國教格式的教案靈感，並可一鍵下載 Word。">
-    <meta name="app-version" content="32-d98fd1d910aa994a2ac99ed6a179414cef195cc6">
+    <meta name="app-version" content="33-796dffc2a4e2467a7d5e321b478a535629a570e3">
     <meta name="theme-color" content="#e73c7e">
     <link rel="canonical" href="https://cagoooo.github.io/prepare/">
 
@@ -106,20 +106,24 @@
                 sessionStorage.setItem('prepare-asset-reload', '1');
             } catch (e) { }
             var jobs = [];
+            // 同網域（cagoooo.github.io）所有工具共用快取與註冊，只清本工具自己的
+            var ownScope = location.origin + '/prepare/';
             if ('serviceWorker' in navigator) {
                 jobs.push(navigator.serviceWorker.getRegistrations().then(function (regs) {
-                    return Promise.all(regs.map(function (r) { return r.unregister(); }));
+                    return Promise.all(regs.filter(function (r) { return r.scope.indexOf(ownScope) === 0; })
+                        .map(function (r) { return r.unregister(); }));
                 }));
             }
             if (window.caches) {
                 jobs.push(caches.keys().then(function (keys) {
-                    return Promise.all(keys.map(function (k) { return caches.delete(k); }));
+                    return Promise.all(keys.filter(function (k) { return k.indexOf('prepare-') === 0; })
+                        .map(function (k) { return caches.delete(k); }));
                 }));
             }
             Promise.all(jobs).catch(function () { }).then(function () { location.reload(); });
         }, true);
     </script>
-  <script type="module" crossorigin src="/prepare/assets/index-6HV-IiUK.js"></script>
+  <script type="module" crossorigin src="/prepare/assets/index-Bjdd_J4i.js"></script>
   <link rel="stylesheet" crossorigin href="/prepare/assets/index-BBpKxEAM.css">
 </head>
 
