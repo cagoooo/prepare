@@ -107,14 +107,18 @@
                 sessionStorage.setItem('prepare-asset-reload', '1');
             } catch (e) { }
             var jobs = [];
+            // 同網域（cagoooo.github.io）所有工具共用快取與註冊，只清本工具自己的
+            var ownScope = location.origin + '/prepare/';
             if ('serviceWorker' in navigator) {
                 jobs.push(navigator.serviceWorker.getRegistrations().then(function (regs) {
-                    return Promise.all(regs.map(function (r) { return r.unregister(); }));
+                    return Promise.all(regs.filter(function (r) { return r.scope.indexOf(ownScope) === 0; })
+                        .map(function (r) { return r.unregister(); }));
                 }));
             }
             if (window.caches) {
                 jobs.push(caches.keys().then(function (keys) {
-                    return Promise.all(keys.map(function (k) { return caches.delete(k); }));
+                    return Promise.all(keys.filter(function (k) { return k.indexOf('prepare-') === 0; })
+                        .map(function (k) { return caches.delete(k); }));
                 }));
             }
             Promise.all(jobs).catch(function () { }).then(function () { location.reload(); });
