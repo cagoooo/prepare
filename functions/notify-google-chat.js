@@ -100,10 +100,11 @@ function shouldNotifyBlocked(ip) {
     return true
 }
 
-function buildTitle(status, siteName) {
-    if (status === 'success') return `✅ 有人使用了 ${siteName}`
-    if (status === 'failed') return `❌ ${siteName} 失敗`
-    return '⚠️ 被擋下的呼叫'
+/** 不含平台名的標題本文（平台名另外放進摘要開頭的【】與卡片標題結尾的｜） */
+function buildHeadline(status, feature) {
+    if (status === 'success') return `有人使用了 ${feature || 'AI 功能'}`
+    if (status === 'failed') return `${feature || 'AI 功能'} 失敗`
+    return '被擋下的呼叫'
 }
 
 /**
@@ -127,7 +128,11 @@ async function notifyGoogleChat(info) {
         if (status === 'blocked' && !shouldNotifyBlocked(info.ip)) return
 
         const meta = STATUS_META[status]
-        const title = buildTitle(status, info.siteName)
+        const headline = buildHeadline(status, info.feature)
+        // 手機推播只看得到摘要第一行 → 平台名放最前面：「✅ 【漢語新解】有人使用了 AI 詞語新解」
+        const summaryLine = `${meta.emoji} 【${info.siteName}】${headline}`
+        // 卡片標題：「✅ 有人使用了 AI 詞語新解｜漢語新解」
+        const title = `${meta.emoji} ${headline}｜${info.siteName}`
         const fields = [
             { label: '網站', value: info.siteName },
             { label: '功能', value: info.feature },
@@ -150,7 +155,7 @@ async function notifyGoogleChat(info) {
             f.value = raw.includes('�') ? GARBLED_PLACEHOLDER : stripGarbled(raw)
         }
 
-        const text = [title, ...fields.map((f) => `${f.label}：${f.value || '—'}`)]
+        const text = [summaryLine, ...fields.map((f) => `${f.label}：${f.value || '—'}`)]
             .join('\n')
             .slice(0, 4000)
 
