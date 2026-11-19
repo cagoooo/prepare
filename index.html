@@ -134,12 +134,12 @@
     <div class="container">
         <div id="auth-bar" class="auth-bar" aria-live="polite">
             <div id="auth-signed-out" class="auth-signed-out">
-                <p class="auth-hint">🔒 請先用 Google 帳號登入才能使用（每人每天 5 次）</p>
+                <p class="auth-hint">🔒 請先用 Google 帳號登入才能使用（每人每天 3 次）</p>
                 <button type="button" id="google-login-btn" class="google-login-btn">使用 Google 帳號登入</button>
             </div>
             <div id="auth-signed-in" class="auth-signed-in" hidden>
                 <span class="auth-user">👋 <b id="auth-user-name"></b></span>
-                <span id="auth-quota" class="auth-quota">今日剩餘 — / 5 次</span>
+                <span id="auth-quota" class="auth-quota">今日剩餘 — / 3 次</span>
                 <button type="button" id="google-logout-btn" class="google-logout-btn">登出</button>
             </div>
             <p id="auth-message" class="auth-message" role="status"></p>
@@ -165,7 +165,7 @@
                 <label class="animated-label">安全驗證：</label>
                 <div id="turnstile-widget" aria-label="Cloudflare 人機驗證"></div>
                 <p id="turnstile-status" role="status" aria-live="polite">正在載入安全驗證…</p>
-                <p class="usage-notice">需用 Google 帳號登入，每人每天最多產生 5 份教案（台北時間午夜重置）；下載 Word 每個網路每小時 10 次；額外輸入最多 2,000 字。</p>
+                <p class="usage-notice">需用 Google 帳號登入，每人每天最多產生 3 份教案（台北時間午夜重置）；下載 Word 每個網路每小時 10 次；額外輸入最多 2,000 字。</p>
             </div>
             <button type="submit" class="generate-button">激發教案靈感(供參考)</button>
         </form>

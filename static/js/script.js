@@ -42,7 +42,8 @@ function quotaKey(user) {
 function readRemaining(user) {
     try {
         const value = localStorage.getItem(quotaKey(user));
-        return value === null ? null : Number(value);
+        // 上限調降後，今天稍早存下的剩餘次數可能比新上限大，顯示時以新上限為準
+        return value === null ? null : Math.min(Number(value), DAILY_LIMIT);
     } catch (_) {
         return null;
     }
@@ -113,12 +114,12 @@ function friendlyPlanError(status, data) {
     if (status === 401) {
         return (data && data.code === 'auth_invalid')
             ? '登入已過期，請按「登出」後重新用 Google 帳號登入。'
-            : '請先用 Google 帳號登入才能使用（每人每天 5 次）。';
+            : '請先用 Google 帳號登入才能使用（每人每天 3 次）。';
     }
     if (status === 403) return (data && data.error) || '人機驗證未通過，請重新完成安全驗證後再試。';
     if (status === 429) {
         return (data && data.code === 'daily_limit')
-            ? '今天的 5 次已用完，明天（台北時間午夜後）再來。'
+            ? '今天的 3 次已用完，明天（台北時間午夜後）再來。'
             : (data && data.error) || '使用次數太頻繁，請稍後再試。';
     }
     return (data && data.error) || `教案產生失敗（HTTP ${status}），請稍後再試。`;
@@ -227,7 +228,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
         // ① 必須先用 Google 帳號登入
         if (!getSignedInUser()) {
-            showAuthMessage('🔒 請先用 Google 帳號登入才能使用（每人每天 5 次）', true);
+            showAuthMessage('🔒 請先用 Google 帳號登入才能使用（每人每天 3 次）', true);
             document.getElementById('auth-bar').scrollIntoView({ behavior: 'smooth', block: 'center' });
             return;
         }
@@ -266,7 +267,7 @@ document.addEventListener('DOMContentLoaded', function () {
         getIdToken()
             .then(idToken => {
                 if (!idToken) {
-                    const err = new Error('請先用 Google 帳號登入才能使用（每人每天 5 次）。');
+                    const err = new Error('請先用 Google 帳號登入才能使用（每人每天 3 次）。');
                     err.friendly = true;
                     throw err;
                 }

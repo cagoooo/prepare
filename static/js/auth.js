@@ -11,7 +11,7 @@ import {
 } from 'firebase/auth';
 import firebaseConfig from './firebase-config.js';
 
-export const DAILY_LIMIT = 5;
+export const DAILY_LIMIT = 3;
 
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);

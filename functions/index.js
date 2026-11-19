@@ -11,7 +11,7 @@ const { getFirestore, Timestamp } = require("firebase-admin/firestore");
 const cors = require("cors")({ origin: "https://cagoooo.github.io" });
 const OpenCC = require("opencc-js");
 const { notifyGoogleChat, getClientIp: getChatClientIp, maskIp, safeUserText } = require("./notify-google-chat");
-// 漢語新解三道防線（Google 登入 → Turnstile → 每日 5 次）；與 cagoooo/words 的 functions/words-guard.js 同一份
+// 漢語新解三道防線（Google 登入 → Turnstile → 每日 3 次）；與 cagoooo/words 的 functions/words-guard.js 同一份
 const {
     DAILY_LIMIT: WORDS_DAILY_LIMIT,
     GuardError: WordsGuardError,
@@ -21,7 +21,7 @@ const {
     refundDailyQuota: wordsRefundDailyQuota,
     describeUser: wordsDescribeUser
 } = require("./words-guard");
-// 備課小幫手每日次數（Google 登入 → Turnstile → 每人每天 5 次）
+// 備課小幫手每日次數（Google 登入 → Turnstile → 每人每天 3 次）
 const { PLAN_DAILY_LIMIT, consumePlanQuota, refundPlanQuota } = require("./prepare-guard");
 
 // ─── Words 專案常數 ────────────────────────────────────────────────────────
@@ -456,7 +456,7 @@ exports.generatePlan = onRequest(
                     return block(verification.status, { error: verification.error });
                 }
 
-                // 同一網路的保險絲（學校共用網路，放寬到每小時 30 次；真正的限制是下面的每人每天 5 次）
+                // 同一網路的保險絲（學校共用網路，放寬到每小時 30 次；真正的限制是下面的每人每天 3 次）
                 let generationLimit;
                 try {
                     generationLimit = await consumeRateLimit(req, "plan_generation", PLAN_IP_HOURLY_LIMIT);
@@ -469,7 +469,7 @@ exports.generatePlan = onRequest(
                     return block(429, { error: `同一個網路每小時最多可產生 ${PLAN_IP_HOURLY_LIMIT} 份教案，請稍後再試。` });
                 }
 
-                // ③ 每位登入使用者每天最多 5 次（台北時間午夜重置）
+                // ③ 每位登入使用者每天最多 3 次（台北時間午夜重置）
                 try {
                     quota = await consumePlanQuota(rateLimitDb, user);
                 } catch (quotaErr) {

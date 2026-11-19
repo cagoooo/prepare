@@ -3,18 +3,18 @@
  *
  *   ① 必須用 Google 帳號登入（沿用 words-guard.js 的 requireGoogleUser，匿名一律不算）→ 401
  *   ② Cloudflare Turnstile 人機驗證（index.js 的 verifyTurnstileToken，action generate_plan）→ 403
- *   ③ 每位登入使用者每天最多 5 次（台北時間午夜重置，Firestore transaction）→ 429
+ *   ③ 每位登入使用者每天最多 3 次（台北時間午夜重置，Firestore transaction）→ 429
  *
  * 順序：登入 → 人機驗證 → 每日次數（通過人機驗證才扣；Gemini 失敗會退回次數）
  *
  * - 次數存在 prepare 專用的 Firestore 資料庫 prepare-rate-limits，集合 prepareDailyUsage，
- *   不與漢語新解（words）的 wordsDailyUsage 共用，兩個網站各自每天 5 次。
+ *   不與漢語新解（words）的 wordsDailyUsage 共用，兩個網站各自每天 3 次。
  */
 
 const { FieldValue, Timestamp } = require('firebase-admin/firestore')
 const { GuardError } = require('./words-guard')
 
-const PLAN_DAILY_LIMIT = 5
+const PLAN_DAILY_LIMIT = 3
 const PLAN_QUOTA_COLLECTION = 'prepareDailyUsage'
 
 /** 台北時間的日期字串 YYYY-MM-DD */

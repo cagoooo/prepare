@@ -3,7 +3,7 @@
  *
  *   ① 必須用 Google 帳號登入（後端 verifyIdToken，匿名一律不算）→ 401
  *   ② Cloudflare Turnstile 人機驗證（siteverify，token 一次性）    → 403
- *   ③ 每位登入使用者每天最多 5 次（台北時間午夜重置，Firestore transaction）→ 429
+ *   ③ 每位登入使用者每天最多 3 次（台北時間午夜重置，Firestore transaction）→ 429
  *
  * 順序：登入 → 人機驗證 → 每日次數（通過人機驗證才扣次數；AI 失敗會退回次數）
  *
@@ -17,7 +17,7 @@
 const { getAuth } = require('firebase-admin/auth')
 const { getFirestore, FieldValue } = require('firebase-admin/firestore')
 
-const DAILY_LIMIT = 5
+const DAILY_LIMIT = 3
 const QUOTA_COLLECTION = 'wordsDailyUsage'
 const TURNSTILE_VERIFY_URL = 'https://challenges.cloudflare.com/turnstile/v0/siteverify'
 const TURNSTILE_EXPECTED_HOSTNAME = 'cagoooo.github.io'
@@ -39,7 +39,7 @@ class GuardError extends Error {
 /** ① 驗證 Google 登入（拒絕沒帶、無效、匿名） */
 async function requireGoogleUser(req) {
     const match = String(req.get('Authorization') || '').match(/^Bearer (.+)$/)
-    if (!match) throw new GuardError(401, '請先用 Google 帳號登入才能使用（每人每天 5 次）', { code: 'auth_required' })
+    if (!match) throw new GuardError(401, '請先用 Google 帳號登入才能使用（每人每天 3 次）', { code: 'auth_required' })
     let decoded
     try {
         decoded = await getAuth().verifyIdToken(match[1])
@@ -48,7 +48,7 @@ async function requireGoogleUser(req) {
     }
     const provider = decoded.firebase && decoded.firebase.sign_in_provider
     if (provider !== 'google.com') {
-        throw new GuardError(401, '請先用 Google 帳號登入才能使用（每人每天 5 次）', { code: 'auth_required' })
+        throw new GuardError(401, '請先用 Google 帳號登入才能使用（每人每天 3 次）', { code: 'auth_required' })
     }
     return decoded
 }

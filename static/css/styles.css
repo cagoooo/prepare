@@ -1012,7 +1012,7 @@ button[type="submit"]:hover {
     }
 }
 
-/* ─── Google 登入列（AI 產生教案必須登入，每人每天 5 次） ─── */
+/* ─── Google 登入列（AI 產生教案必須登入，每人每天 3 次） ─── */
 .auth-bar {
     margin-bottom: 22px;
     padding: 16px 18px;
