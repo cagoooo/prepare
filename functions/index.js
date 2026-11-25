@@ -23,6 +23,7 @@ const {
 } = require("./words-guard");
 // 備課小幫手每日次數（Google 登入 → Turnstile → 每人每天 3 次）
 const { PLAN_DAILY_LIMIT, consumePlanQuota, refundPlanQuota } = require("./prepare-guard");
+const { removeEmbeddedMedia, sanitizeHtmlForDocx } = require("./docx-sanitize");
 
 // ─── Words 專案常數 ────────────────────────────────────────────────────────
 const WORDS_SYSTEM_PROMPT = `你是年輕人,批判現實,思考深刻,語言風趣。
@@ -556,7 +557,9 @@ exports.generatePlan = onRequest(
 
                 let downloadUrl = null;
                 try {
-                    const styledHtml = `<!DOCTYPE html><html><head><style>body { font-family: 'Microsoft JhengHei', sans-serif; font-size: 11pt; } table { border-collapse: collapse; width: 100%; } th, td { border: 1px solid #000; padding: 8px; vertical-align: top; } th { background-color: #D9EAD3; font-weight: bold; }</style></head><body>${content}</body></html>`;
+                    // AI 產出的內容也可能被提示詞誘導夾帶 <img>，轉 Word 前一樣清掉
+                    const docxSafeContent = sanitizeHtmlForDocx(content);
+                    const styledHtml = `<!DOCTYPE html><html><head><style>body { font-family: 'Microsoft JhengHei', sans-serif; font-size: 11pt; } table { border-collapse: collapse; width: 100%; } th, td { border: 1px solid #000; padding: 8px; vertical-align: top; } th { background-color: #D9EAD3; font-weight: bold; }</style></head><body>${docxSafeContent}</body></html>`;
                     const generatedDocx = await HTMLtoDOCX(styledHtml, null, {
                         table: { row: { cantSplit: true } },
                         margins: { top: 720, bottom: 720, left: 1080, right: 1080, header: 720, footer: 720, gutter: 0 },
@@ -661,6 +664,11 @@ exports.downloadDocx = onRequest({
             const { JSDOM } = require("jsdom");
             const dom = new JSDOM(html_content);
             const document = dom.window.document;
+
+            // 使用者送來的 HTML：轉 Word 前移除所有圖片／嵌入媒體，
+            // 否則 html-to-docx 會由伺服器去下載 <img> 的網址並用有漏洞的 image-size 解析
+            const removedMedia = removeEmbeddedMedia(document);
+            if (removedMedia > 0) console.warn(`downloadDocx: removed ${removedMedia} embedded media element(s) before conversion.`);
 
             const normalizeText = value => String(value || "")
                 .replace(/[\t\r\n\f\v]+/g, " ")
