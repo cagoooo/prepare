@@ -25,15 +25,11 @@
 
 ## 三、 設定與安全建議 (給管理者)
 為了保護您的 Gemini API 金鑰與信箱密碼，請務必遵循以下規範：
-1. **不要將真實密碼寫在 `app.py` 中**。
+1. **不要將真實密碼寫在程式碼中**。
 2. 使用 `.env` 檔案來管理敏感資訊。
 3. 上傳至 GitHub 前，請確認 `.gitignore` 包含了 `.env`。
 
-## 四、 關於移植到 GitHub 部署
-由於此專案包含 Python 後端邏輯，GitHub Pages 的靜態空間無法直接運行。
+## 四、 部署方式（現行版本）
+現行版本為 GitHub Pages 前端＋Firebase Cloud Functions 後端，部署方式請見 [README.md](README.md) 的「部署」一節。
 
-**建議方案：**
-1. 將專案推送到 GitHub。
-2. 在 [Render](https://render.com) 建立一個新的 "Web Service"。
-3. 連結您的 GitHub Repo，設定 Build Command 為 `pip install -r requirements.txt` (或 poetry 相關指令)，Start Command 為 `gunicorn app:app`。
-4. 在 Render 的 Environment Variables 面板中設定 `GEMINI_API_KEY` 與 `MAIL_PASSWORD`。
+> 早期 Python／Flask 版本（`app.py`、Render、gunicorn）已於 2026-11-26 移除。

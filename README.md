@@ -4,41 +4,34 @@
 
 > 📌 **目前版本：v1.0.0**（版本管理自 2026-09-06 起，依據 `package.json`）
 
-這是一個專為台灣教師設計的教案生成系統。透過 OpenAI 的強力支援，教師只需輸入基本單元資訊與教學目標，系統即可自動產出符合十二年國教格式的教案。
+這是一個專為台灣教師設計的教案生成系統。教師只需輸入基本單元資訊與教學目標，系統即可透過 Google Gemini 自動產出符合十二年國教格式的教案。
 
 ## 🚀 核心功能
-- **智慧教案生成**：基於 Google Gemini 1.5 Flash，生成包含核心素養、學習重點、教學活動等 20 個項目的完整教案。
+- **智慧教案生成**：基於 Google Gemini（`gemini-2.5-flash-lite`），生成包含核心素養、學習重點、教學活動等 20 個項目的完整教案。
 - **Word 下載功能**：一鍵將生成的教案轉換為標準的 `.docx` 格式。
-- **Email 自動發送**：生成後自動將教案格式化並寄送到指定信箱，方便存檔與分享。
 - **十二年國教適配**：詞彙與邏輯完全符合台灣教育架構。
 
 ## 🛠️ 技術架構
-- **Backend**: Python / Flask
-- **AI Engine**: Google Gemini API
-- **Document Rendering**: `python-docx`
-- **Frontend**: HTML / Vanilla CSS / JavaScript
+- **Frontend**：Vite／HTML／Vanilla CSS／JavaScript，部署在 GitHub Pages（`gh-pages` 分支）
+- **Backend**：Firebase Cloud Functions（`functions/`：`generatePlan`、`downloadDocx`）
+- **AI Engine**：Google Gemini API
+- **Document Rendering**：`html-to-docx`（轉檔前由 `functions/docx-sanitize.js` 移除圖片類標籤，見 [SECURITY.md](SECURITY.md)）
+
+> 早期 Replit 時期的 Python／Flask 版本（`app.py`、`main.py`、`pyproject.toml`、`poetry.lock`、`requirements.txt`）已於 2026-11-26 移除，需要時可從 git 歷史找回。
 
 ## 📦 本地開發環境設置
 
-1. **安裝依賴** (建議使用 Poetry):
+1. **安裝依賴**：
    ```bash
-   poetry install
-   ```
-   *或使用 pip:*
-   ```bash
-   pip install flask flask-sqlalchemy google-generativeai python-docx beautifulsoup4 flask-mail python-dotenv gunicorn
+   npm install
+   (cd functions && npm install)
    ```
 
-2. **設定環境變數**:
-   建立 `.env` 檔案並填入：
-   ```env
-   GEMINI_API_KEY=你的 Gemini API 金鑰
-   MAIL_PASSWORD=信箱應用程式密碼
-   ```
+2. **設定環境變數**：複製 `.env.example` 為 `.env` 並填入自己的測試專案設定（勿提交 `.env`）。
 
-3. **啟動程式**:
+3. **啟動前端**：
    ```bash
-   python app.py
+   npm run dev
    ```
 
 ## 📱 網站圖示、分享卡片與版本更新通知
@@ -48,13 +41,13 @@
 - **更新通知**：使用者開著網頁時若有新部署，畫面會跳出「有新版本」通知列，按下即重新整理載入最新版。網址加 `?swdemo=1` 可預覽通知列樣式。
 - Facebook 若仍顯示舊預覽圖，到 [分享偵錯工具](https://developers.facebook.com/tools/debug/) 貼上網址並按「重新擷取」。
 
-## 🌐 部署至 GitHub 的說明
-雖然 GitHub Pages 不支援運行具有後端的 Flask 程式，但您可以將代碼託管於 GitHub，並透過以下平台進行部署：
-- **Render.com** (推薦，部署設定最簡單)
-- **Google Cloud Run**
-- **Railway.app**
-
-詳細部署流程請參閱 [部署指南 (manual.md)](manual.md)。
+## 🌐 部署
+- **前端**：推送到 `main` 後由 GitHub Actions（`.github/workflows/deploy.yml`）建置並發布到 GitHub Pages。
+- **後端**：Firebase 專案與其他工具共用，**只能點名部署**本 repo 的函式：
+  ```bash
+  firebase deploy --only functions:generatePlan,functions:downloadDocx
+  ```
+  不要用 `--only functions` 或不加 `--only` 的部署，會影響同專案的其他工具。
 
 ---
 
@@ -80,7 +73,6 @@
 ### 技術與專案結構
 
 - `README.md`
-- `app.py`
 - `firebase.json`
 - `functions`
 - `index.html`

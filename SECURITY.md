@@ -26,6 +26,8 @@
 - `html-to-docx` 改版改用外部 image-size（可直接升級時）。
 - 新增其他會呼叫 `HTMLtoDOCX` 的地方，卻沒有先經過 `sanitizeHtmlForDocx` / `removeEmbeddedMedia`。
 
-### 尚未處理：`poetry.lock`、`pyproject.toml`（Python）
+### 2026-11-26：`poetry.lock`、`pyproject.toml`（Python，83 則）
 
-來自 Replit 時期的舊 Flask 版本（`app.py`、`main.py`）。現行正式版為 GitHub Pages＋Cloud Functions，不使用這些 Python 套件。待決定移除舊檔或標為已評估。
+來自 Replit 時期的舊 Flask 版本（`app.py`、`main.py`）。現行正式版為 GitHub Pages＋Cloud Functions，不使用這些 Python 套件。
+已直接移除 `app.py`、`main.py`、`pyproject.toml`、`poetry.lock`、`requirements.txt`，警告會隨檔案消失而自動關閉。
+（`scripts/generate_brand_assets.py` 是產生網站圖示的本機工具，只用 Pillow，保留。）
